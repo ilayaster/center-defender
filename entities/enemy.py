@@ -1,11 +1,13 @@
 import pygame
 import math
 import random
-from settings import CORE_RADIUS
+
+# --- НАСТРОЙКИ ХИТБОКСА ENEMY ---
+ENEMY_HITBOX_BASE_RADIUS = 20  # Базовый радиус хитбокса врага (масштабируется относительно 1080p)
 
 class Enemy:
     def __init__(self, settings, screen_w, screen_h, sprite_manager):
-        self.hitbox_radius = 15 * (screen_h / 1080)
+        self.hitbox_radius = ENEMY_HITBOX_BASE_RADIUS * (screen_h / 1080)
         self.speed = settings['enemy_speed'] * (screen_h / 1080)
         
         angle = random.uniform(0, 2 * math.pi)

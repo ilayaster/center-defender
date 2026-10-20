@@ -3,7 +3,7 @@ import sys
 import math
 import os
 from settings import *
-from ui import Button, DropdownButton
+from ui import Button, DropdownButton, PauseMenu
 from entities import Core, Enemy
 from utils import SpriteManager
 
@@ -49,15 +49,15 @@ class Game:
         }
         self.game_settings = self.DEFAULT_SETTINGS.copy()
 
-        self.STATE_MENU, self.STATE_SETTINGS, self.STATE_PLAYING, self.STATE_GAMEOVER = 0, 1, 2, 3
+        self.STATE_MENU, self.STATE_SETTINGS, self.STATE_PLAYING, self.STATE_GAMEOVER, self.STATE_PAUSED = 0, 1, 2, 3, 4
         self.current_state = self.STATE_MENU
 
         self.enemies, self.score, self.time_left, self.spawn_timer = [], 0, GAME_DURATION, 0
         self.game_won = False
         self.ui_elements = {}
         
-        # НОВОЕ: Создаем объект Core
         self.core = None
+        self.pause_menu = PauseMenu()  # Инициализируем меню паузы
 
         self.apply_settings()
         self.update_difficulty()
@@ -110,6 +110,9 @@ class Game:
         self.ui_elements['btn_back'] = Button(cx - btn_w//2, cy + 200, btn_w, btn_h, "BACK", self.font_medium)
         self.ui_elements['btn_retry'] = Button(cx - btn_w//2, cy + 50, btn_w, btn_h, "RETRY", self.font_medium)
         self.ui_elements['btn_menu'] = Button(cx - btn_w//2, cy + 120, btn_w, btn_h, "MAIN MENU", self.font_medium)
+        
+        # Создаем кнопки для меню паузы
+        self.pause_menu.create_buttons(cx, cy, btn_w, btn_h, self.font_medium)
 
     def apply_settings(self):
         w, h = self.game_settings['resolution']
@@ -128,7 +131,6 @@ class Game:
         self.load_sprites()
         self.font_small, self.font_medium, self.font_large = self.get_fonts()
         
-        # НОВОЕ: Создаем или обновляем Core при смене настроек
         if self.core is None:
             self.core = Core(w, h, self.sprite_manager)
         else:
@@ -149,11 +151,24 @@ class Game:
         self.update_difficulty()
         self.apply_settings()
 
+    def toggle_pause(self):
+        if self.current_state == self.STATE_PLAYING:
+            self.current_state = self.STATE_PAUSED
+        elif self.current_state == self.STATE_PAUSED:
+            self.current_state = self.STATE_PLAYING
+
     def handle_events(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
+
+            # Обработка клавиши ESC
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                if self.current_state == self.STATE_PLAYING:
+                    self.toggle_pause()
+                elif self.current_state == self.STATE_PAUSED:
+                    self.toggle_pause()
 
             if self.current_state == self.STATE_MENU:
                 if self.ui_elements['btn_start'].is_clicked(event): self.reset_game()
@@ -200,6 +215,14 @@ class Game:
                             self.score += 1
                             break
 
+            elif self.current_state == self.STATE_PAUSED:
+                # Обработка событий меню паузы
+                action = self.pause_menu.handle_event(event)
+                if action == 'resume':
+                    self.toggle_pause()
+                elif action == 'quit_to_menu':
+                    self.current_state = self.STATE_MENU
+
             elif self.current_state == self.STATE_GAMEOVER:
                 if self.ui_elements['btn_retry'].is_clicked(event): self.reset_game()
                 elif self.ui_elements['btn_menu'].is_clicked(event): self.current_state = self.STATE_MENU
@@ -238,7 +261,6 @@ class Game:
                 if self.game_settings['spawn_interval'] > 0.2:
                     self.game_settings['spawn_interval'] -= 0.02
 
-            # НОВОЕ: Передаем core в update для проверки коллизии
             for enemy in self.enemies:
                 if enemy.update(self.dt, sw, sh, self.core):
                     self.game_won, self.current_state = False, self.STATE_GAMEOVER
@@ -246,10 +268,8 @@ class Game:
             self.enemies = [e for e in self.enemies if not e.is_dead]
             self.screen.fill(BG_COLOR)
             
-            # НОВОЕ: Рисуем core через его метод draw
             self.core.draw(self.screen, self.game_settings['show_hitboxes'])
             
-            # Таймер над ядром
             timer_text = self.font_small.render(f"TIME: {math.ceil(self.time_left)}", True, TEXT_COLOR)
             timer_rect = timer_text.get_rect(center=(sw // 2, self.core.rect.top - 15))
             self.screen.blit(timer_text, timer_rect)
@@ -259,6 +279,16 @@ class Game:
 
             score_text = self.font_small.render(f"SCORE: {self.score}", True, TEXT_COLOR)
             self.screen.blit(score_text, (sw - score_text.get_width() - 20, 20))
+
+        elif self.current_state == self.STATE_PAUSED:
+            # Рисуем игру на фоне, чтобы было видно, где остановились
+            self.screen.fill(BG_COLOR)
+            self.core.draw(self.screen, self.game_settings['show_hitboxes'])
+            for enemy in self.enemies:
+                enemy.draw(self.screen, self.game_settings['show_hitboxes'])
+            
+            # Делегируем отрисовку меню паузы отдельному классу
+            self.pause_menu.draw(self.screen, sw, sh, self.font_large, self.font_small)
 
         elif self.current_state == self.STATE_GAMEOVER:
             self.screen.fill(BG_COLOR)

@@ -1,11 +1,14 @@
 import pygame
 from settings import CORE_RADIUS
 
+# --- НАСТРОЙКИ ХИТБОКСА CORE ---
+CORE_HITBOX_BASE_RADIUS = 40  # Базовый радиус хитбокса (масштабируется относительно 1080p)
+
 class Core:
     def __init__(self, screen_w, screen_h, sprite_manager):
         self.x = screen_w // 2
         self.y = screen_h // 2
-        self.hitbox_radius = CORE_RADIUS * (screen_h / 1080.0)
+        self.hitbox_radius = CORE_HITBOX_BASE_RADIUS * (screen_h / 1080.0)
         
         self.sprite = sprite_manager.get('core')
         self.rect = self.sprite.get_rect(center=(self.x, self.y))
@@ -14,7 +17,7 @@ class Core:
         """Пересчитывает размер при смене разрешения"""
         self.x = screen_w // 2
         self.y = screen_h // 2
-        self.hitbox_radius = CORE_RADIUS * (screen_h / 1080.0)
+        self.hitbox_radius = CORE_HITBOX_BASE_RADIUS * (screen_h / 1080.0)
         
         self.sprite = sprite_manager.get('core')
         self.rect = self.sprite.get_rect(center=(self.x, self.y))
