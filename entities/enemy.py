@@ -5,7 +5,7 @@ from settings import CORE_RADIUS
 
 class Enemy:
     def __init__(self, settings, screen_w, screen_h, sprite_manager):
-        self.radius = 15 * (screen_h / 1080)
+        self.hitbox_radius = 15 * (screen_h / 1080)
         self.speed = settings['enemy_speed'] * (screen_h / 1080)
         
         angle = random.uniform(0, 2 * math.pi)
@@ -17,7 +17,8 @@ class Enemy:
         self.sprite = sprite_manager.get('enemy')
         self.rect = self.sprite.get_rect()
 
-    def update(self, dt, screen_w, screen_h):
+    def update(self, dt, screen_w, screen_h, core):
+        """Теперь принимает объект core для проверки коллизии"""
         center_x, center_y = screen_w // 2, screen_h // 2
         dx, dy = center_x - self.x, center_y - self.y
         dist = math.hypot(dx, dy)
@@ -26,7 +27,8 @@ class Enemy:
             self.x += (dx / dist) * self.speed * dt
             self.y += (dy / dist) * self.speed * dt
 
-        if dist < (CORE_RADIUS * (screen_h / 1080)) + self.radius:
+        # Используем hitbox_radius из core для проверки столкновения
+        if dist < core.hitbox_radius + self.hitbox_radius:
             return True 
         return False
 
@@ -34,6 +36,5 @@ class Enemy:
         self.rect.center = (int(self.x), int(self.y))
         surface.blit(self.sprite, self.rect)
         
-        # НОВОЕ: Круглый хитбокс врага (реальный радиус коллизии)
         if show_hitboxes:
-            pygame.draw.circle(surface, (0, 255, 0), (int(self.x), int(self.y)), int(self.radius), 2)
+            pygame.draw.circle(surface, (0, 255, 0), (int(self.x), int(self.y)), int(self.hitbox_radius), 2)

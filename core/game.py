@@ -4,7 +4,7 @@ import math
 import os
 from settings import *
 from ui import Button, DropdownButton
-from entities import Enemy
+from entities import Core, Enemy
 from utils import SpriteManager
 
 class Game:
@@ -55,6 +55,9 @@ class Game:
         self.enemies, self.score, self.time_left, self.spawn_timer = [], 0, GAME_DURATION, 0
         self.game_won = False
         self.ui_elements = {}
+        
+        # НОВОЕ: Создаем объект Core
+        self.core = None
 
         self.apply_settings()
         self.update_difficulty()
@@ -66,7 +69,6 @@ class Game:
 
     def get_fonts(self):
         sh = self.screen.get_height()
-        # УМЕНЬШЕНЫ размеры шрифтов
         size_small = max(12, min(16, sh // 60))
         size_medium = max(14, min(20, sh // 45))
         size_large = max(24, min(36, sh // 25))
@@ -101,7 +103,6 @@ class Game:
         
         self.ui_elements['dd_display'] = DropdownButton(cx - dd_w//2, cy + 20, dd_w, dd_h, f"Display: {self.game_settings['display_mode']}", ['Windowed', 'Fullscreen', 'Borderless'], self.font_small, sw)
         
-        # НОВОЕ: Обычная кнопка для хитбоксов (не dropdown)
         hb_text = "Hitboxes: ON" if self.game_settings['show_hitboxes'] else "Hitboxes: OFF"
         self.ui_elements['btn_hitboxes'] = Button(cx - btn_w//2, cy + 80, btn_w, btn_h, hb_text, self.font_small)
         
@@ -126,6 +127,13 @@ class Game:
         
         self.load_sprites()
         self.font_small, self.font_medium, self.font_large = self.get_fonts()
+        
+        # НОВОЕ: Создаем или обновляем Core при смене настроек
+        if self.core is None:
+            self.core = Core(w, h, self.sprite_manager)
+        else:
+            self.core.update_size(w, h, self.sprite_manager)
+        
         self.create_ui()
 
     def reset_game(self):
@@ -175,7 +183,6 @@ class Game:
                     self.game_settings['display_mode'] = disp_val
                     self.apply_settings()
 
-                # НОВОЕ: Обработка клика по кнопке хитбоксов (переключение)
                 if self.ui_elements['btn_hitboxes'].is_clicked(event):
                     self.game_settings['show_hitboxes'] = not self.game_settings['show_hitboxes']
                     hb_text = "Hitboxes: ON" if self.game_settings['show_hitboxes'] else "Hitboxes: OFF"
@@ -188,7 +195,7 @@ class Game:
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     mouse_pos = pygame.mouse.get_pos()
                     for enemy in self.enemies:
-                        if math.hypot(mouse_pos[0] - enemy.x, mouse_pos[1] - enemy.y) < enemy.radius:
+                        if math.hypot(mouse_pos[0] - enemy.x, mouse_pos[1] - enemy.y) < enemy.hitbox_radius:
                             enemy.is_dead = True
                             self.score += 1
                             break
@@ -231,42 +238,31 @@ class Game:
                 if self.game_settings['spawn_interval'] > 0.2:
                     self.game_settings['spawn_interval'] -= 0.02
 
+            # НОВОЕ: Передаем core в update для проверки коллизии
             for enemy in self.enemies:
-                if enemy.update(self.dt, sw, sh):
+                if enemy.update(self.dt, sw, sh, self.core):
                     self.game_won, self.current_state = False, self.STATE_GAMEOVER
 
             self.enemies = [e for e in self.enemies if not e.is_dead]
             self.screen.fill(BG_COLOR)
             
-            # Отрисовка ядра и таймера над ним
-            core_sprite = self.sprite_manager.get('core')
-            if core_sprite:
-                core_rect = core_sprite.get_rect(center=(sw // 2, sh // 2))
-                self.screen.blit(core_sprite, core_rect)
-                
-                # Таймер над ядром
-                timer_text = self.font_small.render(f"TIME: {math.ceil(self.time_left)}", True, TEXT_COLOR)
-                timer_rect = timer_text.get_rect(center=(sw // 2, core_rect.top - 15))
-                self.screen.blit(timer_text, timer_rect)
-                
-                # НОВОЕ: Круглый хитбокс ядра (реальный радиус коллизии)
-                if self.game_settings['show_hitboxes']:
-                    core_hitbox_radius = CORE_RADIUS * (sh / 1080.0)
-                    pygame.draw.circle(self.screen, (0, 255, 0), (sw // 2, sh // 2), int(core_hitbox_radius), 2)
+            # НОВОЕ: Рисуем core через его метод draw
+            self.core.draw(self.screen, self.game_settings['show_hitboxes'])
+            
+            # Таймер над ядром
+            timer_text = self.font_small.render(f"TIME: {math.ceil(self.time_left)}", True, TEXT_COLOR)
+            timer_rect = timer_text.get_rect(center=(sw // 2, self.core.rect.top - 15))
+            self.screen.blit(timer_text, timer_rect)
 
             for enemy in self.enemies:
                 enemy.draw(self.screen, self.game_settings['show_hitboxes'])
 
-            # НОВОЕ: Счет теперь правильно позиционирован (с учетом ширины текста)
             score_text = self.font_small.render(f"SCORE: {self.score}", True, TEXT_COLOR)
             self.screen.blit(score_text, (sw - score_text.get_width() - 20, 20))
 
         elif self.current_state == self.STATE_GAMEOVER:
             self.screen.fill(BG_COLOR)
-            core_sprite = self.sprite_manager.get('core')
-            if core_sprite:
-                core_rect = core_sprite.get_rect(center=(sw // 2, sh // 2))
-                self.screen.blit(core_sprite, core_rect)
+            self.core.draw(self.screen, self.game_settings['show_hitboxes'])
                 
             for enemy in self.enemies: 
                 enemy.draw(self.screen, self.game_settings['show_hitboxes'])
