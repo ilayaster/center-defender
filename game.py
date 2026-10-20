@@ -5,36 +5,56 @@ import os
 from settings import *
 from ui import Button, DropdownButton
 from enemy import Enemy
+from sprites import SpriteManager
+
+# --- ДОБАВЛЕНО: Принудительное включение Nearest Neighbor для всего рендера ---
+os.environ['SDL_RENDER_SCALE_QUALITY'] = 'nearest'
 
 def run():
-    # --- CRITICAL: Center the window on the screen ---
     os.environ['SDL_VIDEO_CENTERED'] = '1'
     pygame.init()
     
     info = pygame.display.Info()
     native_res = (info.current_w, info.current_h)
     
-    raw_modes = pygame.display.list_modes()
+    standard_resolutions = [
+        (640, 480), (800, 600), (1024, 768), (1280, 720), (1280, 800),
+        (1366, 768), (1440, 900), (1600, 900), (1680, 1050),
+        (1920, 1080), (2560, 1440), (3840, 2160)
+    ]
+    
     available_resolutions = []
     seen = set()
     
-    if raw_modes != -1:
-        for w, h in raw_modes:
-            if w >= 800 and h >= 600 and (w, h) not in seen:
-                available_resolutions.append((w, h))
-                seen.add((w, h))
-            if len(available_resolutions) >= 5:
-                break
+    for w, h in standard_resolutions:
+        if w <= native_res[0] and h <= native_res[1] and (w, h) not in seen:
+            available_resolutions.append((w, h))
+            seen.add((w, h))
     
-    if native_res in available_resolutions:
-        available_resolutions.remove(native_res)
-    available_resolutions.insert(0, native_res)
+    if native_res not in seen:
+        available_resolutions.append(native_res)
+    
+    available_resolutions.sort(key=lambda x: (x[0], x[1]))
 
-    initial_res = available_resolutions[0]
+    initial_res = native_res
     
     screen = pygame.display.set_mode(initial_res, 0)
     pygame.display.set_caption("Defend the Core")
     clock = pygame.time.Clock()
+
+    # Initialize Sprite Manager
+    sprite_manager = SpriteManager()
+    
+    def load_sprites():
+        scale_factor = screen.get_height() / 1080.0
+        core_size = int(128 * scale_factor)
+        enemy_size = int(48 * scale_factor)
+        
+        # Загружаем строго статичные .png файлы
+        sprite_manager.load('core', 'core.png', (core_size, core_size))
+        sprite_manager.load('enemy', 'enemy.png', (enemy_size, enemy_size))
+
+    load_sprites()
 
     def get_fonts():
         sh = screen.get_height()
@@ -49,13 +69,15 @@ def run():
 
     font_small, font_medium, font_large = get_fonts()
 
-    game_settings = {
+    DEFAULT_SETTINGS = {
         'difficulty': 'Normal',
-        'resolution': initial_res,
-        'display_mode': 'Borderless',
+        'resolution': native_res,
+        'display_mode': 'Borderless',  # DEFAULT TO BORDERLESS
         'enemy_speed': 150,
         'spawn_interval': 1.0
     }
+
+    game_settings = DEFAULT_SETTINGS.copy()
 
     STATE_MENU = 0
     STATE_SETTINGS = 1
@@ -86,7 +108,7 @@ def run():
         ui_elements['btn_quit'] = Button(cx - btn_w//2, cy + 80, btn_w, btn_h, "QUIT", font_medium)
         
         ui_elements['dd_diff'] = DropdownButton(
-            cx - dd_w//2, cy - 80, dd_w, dd_h, 
+            cx - dd_w//2, cy - 100, dd_w, dd_h, 
             f"Difficulty: {game_settings['difficulty']}", 
             ['Easy', 'Normal', 'Hard'], 
             font_small, sw
@@ -97,22 +119,23 @@ def run():
         
         is_res_enabled = game_settings['display_mode'] != 'Borderless'
         ui_elements['dd_res'] = DropdownButton(
-            cx - dd_w//2, cy - 20, dd_w, dd_h,
+            cx - dd_w//2, cy - 40, dd_w, dd_h,
             f"Resolution: {current_res_text}",
             res_options,
             font_small, sw,
             enabled=is_res_enabled,
-            max_visible=5 # Show max 5 resolutions at once
+            max_visible=6
         )
         
         ui_elements['dd_display'] = DropdownButton(
-            cx - dd_w//2, cy + 40, dd_w, dd_h,
+            cx - dd_w//2, cy + 20, dd_w, dd_h,
             f"Display: {game_settings['display_mode']}",
             ['Windowed', 'Fullscreen', 'Borderless'],
             font_small, sw
         )
         
-        ui_elements['btn_back'] = Button(cx - btn_w//2, cy + 120, btn_w, btn_h, "BACK", font_medium)
+        ui_elements['btn_reset'] = Button(cx - btn_w//2, cy + 80, btn_w, btn_h, "RESET DEFAULTS", font_small)
+        ui_elements['btn_back'] = Button(cx - btn_w//2, cy + 140, btn_w, btn_h, "BACK", font_medium)
         
         ui_elements['btn_retry'] = Button(cx - btn_w//2, cy + 50, btn_w, btn_h, "RETRY", font_medium)
         ui_elements['btn_menu'] = Button(cx - btn_w//2, cy + 120, btn_w, btn_h, "MAIN MENU", font_medium)
@@ -126,15 +149,16 @@ def run():
             w, h = native_res
             game_settings['resolution'] = native_res
         elif game_settings['display_mode'] == 'Fullscreen':
-            flags = pygame.FULLSCREEN
+            flags = pygame.SCALED | pygame.FULLSCREEN
         else:
-            flags = 0 # Standard windowed mode with OS borders
+            flags = 0
             
         screen = pygame.display.set_mode((w, h), flags)
         pygame.display.set_caption("Defend the Core")
+        pygame.event.pump()
         
-        # --- CRITICAL: Force SDL to process window changes immediately ---
-        pygame.event.pump() 
+        # Перезагружаем спрайты с новым размером при смене разрешения
+        load_sprites()
         
         font_small, font_medium, font_large = get_fonts()
         create_ui()
@@ -159,12 +183,20 @@ def run():
             game_settings['enemy_speed'] = 220
             game_settings['spawn_interval'] = 0.5
 
+    def reset_to_defaults():
+        nonlocal game_settings
+        game_settings = DEFAULT_SETTINGS.copy()
+        update_difficulty()
+        apply_settings()
+
     apply_settings()
     update_difficulty()
 
     while True:
         dt = clock.tick(FPS) / 1000.0
         sw, sh = screen.get_width(), screen.get_height()
+        
+        # Анимация удалена отсюда
         
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -177,7 +209,6 @@ def run():
                 if ui_elements['btn_quit'].is_clicked(event): pygame.quit(); sys.exit()
 
             elif current_state == STATE_SETTINGS:
-                # Close dropdowns if clicked outside of them
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     for key, el in ui_elements.items():
                         if isinstance(el, DropdownButton):
@@ -204,6 +235,9 @@ def run():
                 if disp_val:
                     game_settings['display_mode'] = disp_val
                     apply_settings()
+
+                if ui_elements['btn_reset'].is_clicked(event):
+                    reset_to_defaults()
 
                 if ui_elements['btn_back'].is_clicked(event): current_state = STATE_MENU
 
@@ -238,6 +272,7 @@ def run():
             ui_elements['dd_diff'].draw(screen)
             ui_elements['dd_res'].draw(screen)
             ui_elements['dd_display'].draw(screen)
+            ui_elements['btn_reset'].draw(screen)
             ui_elements['btn_back'].draw(screen)
 
         elif current_state == STATE_PLAYING:
@@ -249,7 +284,7 @@ def run():
 
             spawn_timer += dt
             if spawn_timer >= game_settings['spawn_interval']:
-                enemies.append(Enemy(game_settings, sw, sh))
+                enemies.append(Enemy(game_settings, sw, sh, sprite_manager))
                 spawn_timer = 0
                 if game_settings['spawn_interval'] > 0.2:
                     game_settings['spawn_interval'] -= 0.02
@@ -262,8 +297,13 @@ def run():
             enemies = [e for e in enemies if not e.is_dead]
 
             screen.fill(BG_COLOR)
-            pygame.draw.circle(screen, CORE_COLOR, (sw // 2, sh // 2), CORE_RADIUS)
-            pygame.draw.circle(screen, (255, 255, 255), (sw // 2, sh // 2), CORE_RADIUS, 3)
+            
+            # Рисуем статичный спрайт ядра
+            core_sprite = sprite_manager.get('core')
+            if core_sprite:
+                core_rect = core_sprite.get_rect(center=(sw // 2, sh // 2))
+                screen.blit(core_sprite, core_rect)
+
             for enemy in enemies:
                 enemy.draw(screen)
 
@@ -274,7 +314,13 @@ def run():
 
         elif current_state == STATE_GAMEOVER:
             screen.fill(BG_COLOR)
-            pygame.draw.circle(screen, CORE_COLOR, (sw // 2, sh // 2), CORE_RADIUS)
+            
+            # Рисуем статичный спрайт ядра
+            core_sprite = sprite_manager.get('core')
+            if core_sprite:
+                core_rect = core_sprite.get_rect(center=(sw // 2, sh // 2))
+                screen.blit(core_sprite, core_rect)
+                
             for enemy in enemies: 
                 enemy.draw(screen)
             
