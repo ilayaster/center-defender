@@ -35,9 +35,10 @@ def run():
 
     def get_fonts():
         sh = screen.get_height()
-        size_small = max(20, sh // 35)
-        size_medium = max(28, sh // 25)
-        size_large = max(48, sh // 15)
+        # --- FIXED: Reduced font sizes for a cleaner, more compact look ---
+        size_small = max(16, min(22, sh // 45))
+        size_medium = max(20, min(28, sh // 32))
+        size_large = max(32, min(48, sh // 18))
         return (
             pygame.font.SysFont("arial", size_small, bold=True),
             pygame.font.SysFont("arial", size_medium, bold=True),
@@ -70,15 +71,23 @@ def run():
 
     def create_ui():
         nonlocal ui_elements, font_small, font_medium
+        # --- FIXED: Clear old UI elements to prevent broken layout on resolution change ---
+        ui_elements.clear() 
+        
         sw, sh = screen.get_width(), screen.get_height()
         cx, cy = sw // 2, sh // 2
         
-        ui_elements['btn_start'] = Button(cx - 100, cy - 60, 200, 50, "START GAME", font_medium)
-        ui_elements['btn_settings'] = Button(cx - 100, cy + 10, 200, 50, "SETTINGS", font_medium)
-        ui_elements['btn_quit'] = Button(cx - 100, cy + 80, 200, 50, "QUIT", font_medium)
+        btn_w, btn_h = 200, 45
+        dd_w, dd_h = 240, 40
         
+        # Menu Buttons
+        ui_elements['btn_start'] = Button(cx - btn_w//2, cy - 60, btn_w, btn_h, "START GAME", font_medium)
+        ui_elements['btn_settings'] = Button(cx - btn_w//2, cy + 10, btn_w, btn_h, "SETTINGS", font_medium)
+        ui_elements['btn_quit'] = Button(cx - btn_w//2, cy + 80, btn_w, btn_h, "QUIT", font_medium)
+        
+        # Settings Dropdowns
         ui_elements['dd_diff'] = DropdownButton(
-            cx - 120, cy - 80, 240, 40, 
+            cx - dd_w//2, cy - 80, dd_w, dd_h, 
             f"Difficulty: {game_settings['difficulty']}", 
             ['Easy', 'Normal', 'Hard'], 
             font_small, sw
@@ -89,7 +98,7 @@ def run():
         
         is_res_enabled = game_settings['display_mode'] != 'Borderless'
         ui_elements['dd_res'] = DropdownButton(
-            cx - 120, cy - 20, 240, 40,
+            cx - dd_w//2, cy - 20, dd_w, dd_h,
             f"Resolution: {current_res_text}",
             res_options,
             font_small, sw,
@@ -97,16 +106,17 @@ def run():
         )
         
         ui_elements['dd_display'] = DropdownButton(
-            cx - 120, cy + 40, 240, 40,
+            cx - dd_w//2, cy + 40, dd_w, dd_h,
             f"Display: {game_settings['display_mode']}",
             ['Windowed', 'Fullscreen', 'Borderless'],
             font_small, sw
         )
         
-        ui_elements['btn_back'] = Button(cx - 100, cy + 120, 200, 50, "BACK", font_medium)
+        ui_elements['btn_back'] = Button(cx - btn_w//2, cy + 120, btn_w, btn_h, "BACK", font_medium)
         
-        ui_elements['btn_retry'] = Button(cx - 100, cy + 50, 200, 50, "RETRY", font_medium)
-        ui_elements['btn_menu'] = Button(cx - 100, cy + 120, 200, 50, "MAIN MENU", font_medium)
+        # Game Over Buttons
+        ui_elements['btn_retry'] = Button(cx - btn_w//2, cy + 50, btn_w, btn_h, "RETRY", font_medium)
+        ui_elements['btn_menu'] = Button(cx - btn_w//2, cy + 120, btn_w, btn_h, "MAIN MENU", font_medium)
 
     def apply_settings():
         nonlocal screen, font_small, font_medium, font_large

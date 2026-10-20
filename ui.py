@@ -41,12 +41,19 @@ class DropdownButton:
         # Smart direction: open right if fits, otherwise left
         self.direction = 'right' if x + width * 2 <= screen_width else 'left'
         
+        # --- NEW: Calculate vertical offset to center the dropdown relative to the button ---
+        self.option_height = height
+        self.total_options_height = len(options) * self.option_height
+        self.y_offset = (self.rect.height - self.total_options_height) / 2
+        
         self.option_rects = []
         for i, opt in enumerate(options):
+            opt_y = int(self.rect.y + self.y_offset + i * self.option_height)
             if self.direction == 'right':
-                rect = pygame.Rect(x + width, y - i * height, width, height)
+                opt_x = self.rect.x + self.rect.width
             else:
-                rect = pygame.Rect(x - width, y - i * height, width, height)
+                opt_x = self.rect.x - self.rect.width
+            rect = pygame.Rect(opt_x, opt_y, self.rect.width, self.option_height)
             self.option_rects.append((opt, rect))
 
     def draw(self, surface):
@@ -91,8 +98,8 @@ class DropdownButton:
 
         if self.is_open and self.enabled:
             if self.option_rects:
-                min_y = self.option_rects[-1][1].y
-                max_y = self.option_rects[0][1].bottom
+                min_y = self.option_rects[0][1].y
+                max_y = self.option_rects[-1][1].bottom
                 if self.direction == 'right':
                     bg_x = self.rect.x + self.rect.width
                 else:
