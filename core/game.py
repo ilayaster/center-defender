@@ -49,7 +49,8 @@ class Game:
         }
         self.game_settings = self.DEFAULT_SETTINGS.copy()
 
-        self.STATE_MENU, self.STATE_SETTINGS, self.STATE_PLAYING, self.STATE_GAMEOVER, self.STATE_PAUSED = 0, 1, 2, 3, 4
+        # НОВОЕ: Добавлено состояние STATE_DIFFICULTY
+        self.STATE_MENU, self.STATE_DIFFICULTY, self.STATE_SETTINGS, self.STATE_PLAYING, self.STATE_GAMEOVER, self.STATE_PAUSED = 0, 1, 2, 3, 4, 5
         self.current_state = self.STATE_MENU
 
         self.enemies, self.score, self.time_left, self.spawn_timer = [], 0, GAME_DURATION, 0
@@ -57,7 +58,7 @@ class Game:
         self.ui_elements = {}
         
         self.core = None
-        self.pause_menu = PauseMenu()  # Инициализируем меню паузы
+        self.pause_menu = PauseMenu()
 
         self.apply_settings()
         self.update_difficulty()
@@ -91,27 +92,41 @@ class Game:
         cx, cy = sw // 2, sh // 2
         btn_w, btn_h, dd_w, dd_h = 200, 45, 240, 40
         
+        # --- ГЛАВНОЕ МЕНЮ ---
         self.ui_elements['btn_start'] = Button(cx - btn_w//2, cy - 60, btn_w, btn_h, "START GAME", self.font_medium)
         self.ui_elements['btn_settings'] = Button(cx - btn_w//2, cy + 10, btn_w, btn_h, "SETTINGS", self.font_medium)
         self.ui_elements['btn_quit'] = Button(cx - btn_w//2, cy + 80, btn_w, btn_h, "QUIT", self.font_medium)
         
-        self.ui_elements['dd_diff'] = DropdownButton(cx - dd_w//2, cy - 100, dd_w, dd_h, f"Difficulty: {self.game_settings['difficulty']}", ['Easy', 'Normal', 'Hard'], self.font_small, sw)
+        # --- НОВОЕ: ЭКРАН ВЫБОРА СЛОЖНОСТИ ---
+        # Три кнопки бок о бок
+        diff_btn_w = 150  # Ширина кнопок сложности
+        diff_spacing = 20  # Расстояние между кнопками
+        total_width = diff_btn_w * 3 + diff_spacing * 2
+        start_x = cx - total_width // 2
         
+        self.ui_elements['btn_easy'] = Button(start_x, cy - 30, diff_btn_w, btn_h, "EASY", self.font_medium)
+        self.ui_elements['btn_normal'] = Button(start_x + diff_btn_w + diff_spacing, cy - 30, diff_btn_w, btn_h, "NORMAL", self.font_medium)
+        self.ui_elements['btn_hard'] = Button(start_x + (diff_btn_w + diff_spacing) * 2, cy - 30, diff_btn_w, btn_h, "HARD", self.font_medium)
+        self.ui_elements['btn_diff_back'] = Button(cx - btn_w//2, cy + 80, btn_w, btn_h, "BACK", self.font_medium)
+        
+        # --- НАСТРОЙКИ ---
         res_options = [f"{w}x{h}" for w, h in self.available_resolutions]
         current_res_text = "Native" if self.game_settings['resolution'] == self.native_res else f"{self.game_settings['resolution'][0]}x{self.game_settings['resolution'][1]}"
-        self.ui_elements['dd_res'] = DropdownButton(cx - dd_w//2, cy - 40, dd_w, dd_h, f"Resolution: {current_res_text}", res_options, self.font_small, sw, enabled=(self.game_settings['display_mode'] != 'Borderless'), max_visible=6)
+        self.ui_elements['dd_res'] = DropdownButton(cx - dd_w//2, cy - 100, dd_w, dd_h, f"Resolution: {current_res_text}", res_options, self.font_small, sw, enabled=(self.game_settings['display_mode'] != 'Borderless'), max_visible=6)
         
-        self.ui_elements['dd_display'] = DropdownButton(cx - dd_w//2, cy + 20, dd_w, dd_h, f"Display: {self.game_settings['display_mode']}", ['Windowed', 'Fullscreen', 'Borderless'], self.font_small, sw)
+        self.ui_elements['dd_display'] = DropdownButton(cx - dd_w//2, cy - 40, dd_w, dd_h, f"Display: {self.game_settings['display_mode']}", ['Windowed', 'Fullscreen', 'Borderless'], self.font_small, sw)
         
         hb_text = "Hitboxes: ON" if self.game_settings['show_hitboxes'] else "Hitboxes: OFF"
-        self.ui_elements['btn_hitboxes'] = Button(cx - btn_w//2, cy + 80, btn_w, btn_h, hb_text, self.font_small)
+        self.ui_elements['btn_hitboxes'] = Button(cx - btn_w//2, cy + 20, btn_w, btn_h, hb_text, self.font_small)
         
-        self.ui_elements['btn_reset'] = Button(cx - btn_w//2, cy + 140, btn_w, btn_h, "RESET DEFAULTS", self.font_small)
-        self.ui_elements['btn_back'] = Button(cx - btn_w//2, cy + 200, btn_w, btn_h, "BACK", self.font_medium)
+        self.ui_elements['btn_reset'] = Button(cx - btn_w//2, cy + 80, btn_w, btn_h, "RESET DEFAULTS", self.font_small)
+        self.ui_elements['btn_back'] = Button(cx - btn_w//2, cy + 140, btn_w, btn_h, "BACK", self.font_medium)
+        
+        # --- GAME OVER ---
         self.ui_elements['btn_retry'] = Button(cx - btn_w//2, cy + 50, btn_w, btn_h, "RETRY", self.font_medium)
         self.ui_elements['btn_menu'] = Button(cx - btn_w//2, cy + 120, btn_w, btn_h, "MAIN MENU", self.font_medium)
         
-        # Создаем кнопки для меню паузы
+        # --- МЕНЮ ПАУЗЫ ---
         self.pause_menu.create_buttons(cx, cy, btn_w, btn_h, self.font_medium)
 
     def apply_settings(self):
@@ -171,9 +186,30 @@ class Game:
                     self.toggle_pause()
 
             if self.current_state == self.STATE_MENU:
-                if self.ui_elements['btn_start'].is_clicked(event): self.reset_game()
-                elif self.ui_elements['btn_settings'].is_clicked(event): self.current_state = self.STATE_SETTINGS
-                elif self.ui_elements['btn_quit'].is_clicked(event): pygame.quit(); sys.exit()
+                # НОВОЕ: START GAME теперь ведет на экран выбора сложности
+                if self.ui_elements['btn_start'].is_clicked(event): 
+                    self.current_state = self.STATE_DIFFICULTY
+                elif self.ui_elements['btn_settings'].is_clicked(event): 
+                    self.current_state = self.STATE_SETTINGS
+                elif self.ui_elements['btn_quit'].is_clicked(event): 
+                    pygame.quit(); sys.exit()
+
+            # НОВОЕ: Обработка экрана выбора сложности
+            elif self.current_state == self.STATE_DIFFICULTY:
+                if self.ui_elements['btn_easy'].is_clicked(event):
+                    self.game_settings['difficulty'] = 'Easy'
+                    self.update_difficulty()
+                    self.reset_game()
+                elif self.ui_elements['btn_normal'].is_clicked(event):
+                    self.game_settings['difficulty'] = 'Normal'
+                    self.update_difficulty()
+                    self.reset_game()
+                elif self.ui_elements['btn_hard'].is_clicked(event):
+                    self.game_settings['difficulty'] = 'Hard'
+                    self.update_difficulty()
+                    self.reset_game()
+                elif self.ui_elements['btn_diff_back'].is_clicked(event):
+                    self.current_state = self.STATE_MENU
 
             elif self.current_state == self.STATE_SETTINGS:
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -182,12 +218,6 @@ class Game:
                             if not el.rect.collidepoint(event.pos) and not any(r.collidepoint(event.pos) for _, r, _ in el.get_visible_rects()):
                                 el.is_open, el.scroll_offset = False, 0
 
-                diff_val = self.ui_elements['dd_diff'].handle_event(event)
-                if diff_val:
-                    self.game_settings['difficulty'] = diff_val
-                    self.update_difficulty()
-                    self.ui_elements['dd_diff'].text = f"Difficulty: {diff_val}"
-                    
                 res_val = self.ui_elements['dd_res'].handle_event(event)
                 if res_val:
                     self.game_settings['resolution'] = tuple(map(int, res_val.split('x')))
@@ -203,8 +233,10 @@ class Game:
                     hb_text = "Hitboxes: ON" if self.game_settings['show_hitboxes'] else "Hitboxes: OFF"
                     self.ui_elements['btn_hitboxes'].text = hb_text
 
-                if self.ui_elements['btn_reset'].is_clicked(event): self.reset_to_defaults()
-                elif self.ui_elements['btn_back'].is_clicked(event): self.current_state = self.STATE_MENU
+                if self.ui_elements['btn_reset'].is_clicked(event): 
+                    self.reset_to_defaults()
+                elif self.ui_elements['btn_back'].is_clicked(event): 
+                    self.current_state = self.STATE_MENU
 
             elif self.current_state == self.STATE_PLAYING:
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -216,7 +248,6 @@ class Game:
                             break
 
             elif self.current_state == self.STATE_PAUSED:
-                # Обработка событий меню паузы
                 action = self.pause_menu.handle_event(event)
                 if action == 'resume':
                     self.toggle_pause()
@@ -224,8 +255,10 @@ class Game:
                     self.current_state = self.STATE_MENU
 
             elif self.current_state == self.STATE_GAMEOVER:
-                if self.ui_elements['btn_retry'].is_clicked(event): self.reset_game()
-                elif self.ui_elements['btn_menu'].is_clicked(event): self.current_state = self.STATE_MENU
+                if self.ui_elements['btn_retry'].is_clicked(event): 
+                    self.reset_game()
+                elif self.ui_elements['btn_menu'].is_clicked(event): 
+                    self.current_state = self.STATE_MENU
 
     def draw(self):
         sw, sh = self.screen.get_width(), self.screen.get_height()
@@ -238,11 +271,21 @@ class Game:
             self.ui_elements['btn_settings'].draw(self.screen)
             self.ui_elements['btn_quit'].draw(self.screen)
 
+        # НОВОЕ: Отрисовка экрана выбора сложности
+        elif self.current_state == self.STATE_DIFFICULTY:
+            self.screen.fill(MENU_BG)
+            title = self.font_large.render("SELECT DIFFICULTY", True, TEXT_COLOR)
+            self.screen.blit(title, (sw//2 - title.get_width()//2, sh//2 - 120))
+            
+            self.ui_elements['btn_easy'].draw(self.screen)
+            self.ui_elements['btn_normal'].draw(self.screen)
+            self.ui_elements['btn_hard'].draw(self.screen)
+            self.ui_elements['btn_diff_back'].draw(self.screen)
+
         elif self.current_state == self.STATE_SETTINGS:
             self.screen.fill(MENU_BG)
             title = self.font_large.render("SETTINGS", True, TEXT_COLOR)
             self.screen.blit(title, (sw//2 - title.get_width()//2, sh//2 - 180))
-            self.ui_elements['dd_diff'].draw(self.screen)
             self.ui_elements['dd_res'].draw(self.screen)
             self.ui_elements['dd_display'].draw(self.screen)
             self.ui_elements['btn_hitboxes'].draw(self.screen)
@@ -281,19 +324,15 @@ class Game:
             self.screen.blit(score_text, (sw - score_text.get_width() - 20, 20))
 
         elif self.current_state == self.STATE_PAUSED:
-            # Рисуем игру на фоне, чтобы было видно, где остановились
             self.screen.fill(BG_COLOR)
             self.core.draw(self.screen, self.game_settings['show_hitboxes'])
             for enemy in self.enemies:
                 enemy.draw(self.screen, self.game_settings['show_hitboxes'])
-            
-            # Делегируем отрисовку меню паузы отдельному классу
             self.pause_menu.draw(self.screen, sw, sh, self.font_large, self.font_small)
 
         elif self.current_state == self.STATE_GAMEOVER:
             self.screen.fill(BG_COLOR)
             self.core.draw(self.screen, self.game_settings['show_hitboxes'])
-                
             for enemy in self.enemies: 
                 enemy.draw(self.screen, self.game_settings['show_hitboxes'])
             
