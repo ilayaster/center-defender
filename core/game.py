@@ -1,11 +1,15 @@
 import pygame
 import sys
-import math
 import os
 from settings import *
-from ui import Button, DropdownButton, PauseMenu
-from entities import Core, Enemy
+from ui import DropdownButton, PauseMenu
+from entities import Core
 from utils import SpriteManager
+from core.constants import *
+from core.assets import AssetManager
+from core.ui_factory import UIFactory
+from core.gameplay import GameplayManager
+from core.renderer import Renderer
 
 class Game:
     def __init__(self):
@@ -15,122 +19,47 @@ class Game:
         self.info = pygame.display.Info()
         self.native_res = (self.info.current_w, self.info.current_h)
         
-        standard_resolutions = [
-            (640, 480), (800, 600), (1024, 768), (1280, 720), (1280, 800),
-            (1366, 768), (1440, 900), (1600, 900), (1680, 1050),
-            (1920, 1080), (2560, 1440), (3840, 2160)
-        ]
-        
+        # Фильтрация доступных разрешений
         self.available_resolutions = []
         seen = set()
-        for w, h in standard_resolutions:
+        for w, h in STANDARD_RESOLUTIONS:
             if w <= self.native_res[0] and h <= self.native_res[1] and (w, h) not in seen:
                 self.available_resolutions.append((w, h))
                 seen.add((w, h))
-        
         if self.native_res not in seen:
             self.available_resolutions.append(self.native_res)
         self.available_resolutions.sort(key=lambda x: (x[0], x[1]))
-
+        
+        # Инициализация экрана
         self.screen = pygame.display.set_mode(self.native_res, 0)
         pygame.display.set_caption("Defend the Core")
         self.clock = pygame.time.Clock()
-
+        
+        # Менеджеры
         self.sprite_manager = SpriteManager()
-        self.load_sprites()
-
-        self.DEFAULT_SETTINGS = {
-            'difficulty': 'Normal',
-            'resolution': self.native_res,
-            'display_mode': 'Borderless',
-            'enemy_speed': 150,
-            'spawn_interval': 1.0,
-            'show_hitboxes': False
-        }
-        self.game_settings = self.DEFAULT_SETTINGS.copy()
-
-        # НОВОЕ: Добавлено состояние STATE_DIFFICULTY
-        self.STATE_MENU, self.STATE_DIFFICULTY, self.STATE_SETTINGS, self.STATE_PLAYING, self.STATE_GAMEOVER, self.STATE_PAUSED = 0, 1, 2, 3, 4, 5
-        self.current_state = self.STATE_MENU
-
-        self.enemies, self.score, self.time_left, self.spawn_timer = [], 0, GAME_DURATION, 0
-        self.game_won = False
+        self.asset_manager = AssetManager(self.sprite_manager, self.screen)
+        self.pause_menu = PauseMenu()
+        
+        # Настройки
+        self.game_settings = get_default_settings(self.native_res)
+        
+        # Состояние
+        self.current_state = STATE_MENU
+        
+        # Игровые объекты
+        self.core = None
+        self.gameplay = None
+        
+        # UI
         self.ui_elements = {}
         
-        self.core = None
-        self.pause_menu = PauseMenu()
-
+        # Загрузка и применение настроек
         self.apply_settings()
-        self.update_difficulty()
-
-    def load_sprites(self):
-        scale_factor = self.screen.get_height() / 1080.0
-        self.sprite_manager.load('core', 'core.png', (int(128 * scale_factor), int(128 * scale_factor)))
-        self.sprite_manager.load('enemy', 'enemy.png', (int(48 * scale_factor), int(48 * scale_factor)))
-
-    def get_fonts(self):
-        sh = self.screen.get_height()
-        size_small = max(12, min(16, sh // 60))
-        size_medium = max(14, min(20, sh // 45))
-        size_large = max(24, min(36, sh // 25))
-        
-        try:
-            font_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "fonts", "pixel.ttf")
-            font_small = pygame.font.Font(font_path, size_small)
-            font_medium = pygame.font.Font(font_path, size_medium)
-            font_large = pygame.font.Font(font_path, size_large)
-        except FileNotFoundError:
-            font_small = pygame.font.SysFont("courier", size_small, bold=True)
-            font_medium = pygame.font.SysFont("courier", size_medium, bold=True)
-            font_large = pygame.font.SysFont("courier", size_large, bold=True)
-            
-        return font_small, font_medium, font_large
-
-    def create_ui(self):
-        self.ui_elements.clear()
-        sw, sh = self.screen.get_width(), self.screen.get_height()
-        cx, cy = sw // 2, sh // 2
-        btn_w, btn_h, dd_w, dd_h = 200, 45, 240, 40
-        
-        # --- ГЛАВНОЕ МЕНЮ ---
-        self.ui_elements['btn_start'] = Button(cx - btn_w//2, cy - 60, btn_w, btn_h, "START GAME", self.font_medium)
-        self.ui_elements['btn_settings'] = Button(cx - btn_w//2, cy + 10, btn_w, btn_h, "SETTINGS", self.font_medium)
-        self.ui_elements['btn_quit'] = Button(cx - btn_w//2, cy + 80, btn_w, btn_h, "QUIT", self.font_medium)
-        
-        # --- НОВОЕ: ЭКРАН ВЫБОРА СЛОЖНОСТИ ---
-        # Три кнопки бок о бок
-        diff_btn_w = 150  # Ширина кнопок сложности
-        diff_spacing = 20  # Расстояние между кнопками
-        total_width = diff_btn_w * 3 + diff_spacing * 2
-        start_x = cx - total_width // 2
-        
-        self.ui_elements['btn_easy'] = Button(start_x, cy - 30, diff_btn_w, btn_h, "EASY", self.font_medium)
-        self.ui_elements['btn_normal'] = Button(start_x + diff_btn_w + diff_spacing, cy - 30, diff_btn_w, btn_h, "NORMAL", self.font_medium)
-        self.ui_elements['btn_hard'] = Button(start_x + (diff_btn_w + diff_spacing) * 2, cy - 30, diff_btn_w, btn_h, "HARD", self.font_medium)
-        self.ui_elements['btn_diff_back'] = Button(cx - btn_w//2, cy + 80, btn_w, btn_h, "BACK", self.font_medium)
-        
-        # --- НАСТРОЙКИ ---
-        res_options = [f"{w}x{h}" for w, h in self.available_resolutions]
-        current_res_text = "Native" if self.game_settings['resolution'] == self.native_res else f"{self.game_settings['resolution'][0]}x{self.game_settings['resolution'][1]}"
-        self.ui_elements['dd_res'] = DropdownButton(cx - dd_w//2, cy - 100, dd_w, dd_h, f"Resolution: {current_res_text}", res_options, self.font_small, sw, enabled=(self.game_settings['display_mode'] != 'Borderless'), max_visible=6)
-        
-        self.ui_elements['dd_display'] = DropdownButton(cx - dd_w//2, cy - 40, dd_w, dd_h, f"Display: {self.game_settings['display_mode']}", ['Windowed', 'Fullscreen', 'Borderless'], self.font_small, sw)
-        
-        hb_text = "Hitboxes: ON" if self.game_settings['show_hitboxes'] else "Hitboxes: OFF"
-        self.ui_elements['btn_hitboxes'] = Button(cx - btn_w//2, cy + 20, btn_w, btn_h, hb_text, self.font_small)
-        
-        self.ui_elements['btn_reset'] = Button(cx - btn_w//2, cy + 80, btn_w, btn_h, "RESET DEFAULTS", self.font_small)
-        self.ui_elements['btn_back'] = Button(cx - btn_w//2, cy + 140, btn_w, btn_h, "BACK", self.font_medium)
-        
-        # --- GAME OVER ---
-        self.ui_elements['btn_retry'] = Button(cx - btn_w//2, cy + 50, btn_w, btn_h, "RETRY", self.font_medium)
-        self.ui_elements['btn_menu'] = Button(cx - btn_w//2, cy + 120, btn_w, btn_h, "MAIN MENU", self.font_medium)
-        
-        # --- МЕНЮ ПАУЗЫ ---
-        self.pause_menu.create_buttons(cx, cy, btn_w, btn_h, self.font_medium)
-
+    
     def apply_settings(self):
+        """Применяет настройки экрана и загружает ресурсы"""
         w, h = self.game_settings['resolution']
+        
         if self.game_settings['display_mode'] == 'Borderless':
             flags, w, h = pygame.NOFRAME, self.native_res[0], self.native_res[1]
             self.game_settings['resolution'] = self.native_res
@@ -138,64 +67,82 @@ class Game:
             flags = pygame.SCALED | pygame.FULLSCREEN
         else:
             flags = 0
-            
+        
         self.screen = pygame.display.set_mode((w, h), flags)
         pygame.display.set_caption("Defend the Core")
         pygame.event.pump()
         
-        self.load_sprites()
-        self.font_small, self.font_medium, self.font_large = self.get_fonts()
+        # Загрузка ресурсов
+        self.asset_manager.load_all()
         
+        # Создание ядра
         if self.core is None:
             self.core = Core(w, h, self.sprite_manager)
         else:
             self.core.update_size(w, h, self.sprite_manager)
         
-        self.create_ui()
-
+        # Создание менеджера геймплея
+        if self.gameplay is None:
+            self.gameplay = GameplayManager(self.game_settings, self.core, self.sprite_manager)
+        
+        # Создание UI
+        sw, sh = self.screen.get_width(), self.screen.get_height()
+        cx, cy = sw // 2, sh // 2
+        btn_w, btn_h, dd_w, dd_h = 200, 45, 240, 40
+        
+        self.ui_elements = UIFactory.create_all(
+            cx, cy, btn_w, btn_h, dd_w, dd_h,
+            self.asset_manager.font_small, self.asset_manager.font_medium,
+            self.available_resolutions, self.native_res, self.game_settings, sw,
+            self.pause_menu
+        )
+    
     def reset_game(self):
-        self.enemies, self.score, self.time_left, self.spawn_timer, self.game_won = [], 0, GAME_DURATION, 0, False
-        self.current_state = self.STATE_PLAYING
-
+        """Сбрасывает игру и переходит в состояние PLAYING"""
+        self.gameplay.reset()
+        self.current_state = STATE_PLAYING
+    
     def update_difficulty(self):
-        diffs = {'Easy': (100, 1.5), 'Normal': (150, 1.0), 'Hard': (220, 0.5)}
-        self.game_settings['enemy_speed'], self.game_settings['spawn_interval'] = diffs[self.game_settings['difficulty']]
-
+        """Обновляет параметры сложности"""
+        self.gameplay.update_difficulty()
+    
     def reset_to_defaults(self):
-        self.game_settings = self.DEFAULT_SETTINGS.copy()
+        """Сбрасывает настройки к значениям по умолчанию"""
+        self.game_settings = get_default_settings(self.native_res)
         self.update_difficulty()
         self.apply_settings()
-
+    
     def toggle_pause(self):
-        if self.current_state == self.STATE_PLAYING:
-            self.current_state = self.STATE_PAUSED
-        elif self.current_state == self.STATE_PAUSED:
-            self.current_state = self.STATE_PLAYING
-
+        """Переключает паузу"""
+        if self.current_state == STATE_PLAYING:
+            self.current_state = STATE_PAUSED
+        elif self.current_state == STATE_PAUSED:
+            self.current_state = STATE_PLAYING
+    
     def handle_events(self):
+        """Обрабатывает все события"""
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
-
-            # Обработка клавиши ESC
+            
+            # ESC для паузы
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                if self.current_state == self.STATE_PLAYING:
+                if self.current_state in (STATE_PLAYING, STATE_PAUSED):
                     self.toggle_pause()
-                elif self.current_state == self.STATE_PAUSED:
-                    self.toggle_pause()
-
-            if self.current_state == self.STATE_MENU:
-                # НОВОЕ: START GAME теперь ведет на экран выбора сложности
-                if self.ui_elements['btn_start'].is_clicked(event): 
-                    self.current_state = self.STATE_DIFFICULTY
-                elif self.ui_elements['btn_settings'].is_clicked(event): 
-                    self.current_state = self.STATE_SETTINGS
-                elif self.ui_elements['btn_quit'].is_clicked(event): 
-                    pygame.quit(); sys.exit()
-
-            # НОВОЕ: Обработка экрана выбора сложности
-            elif self.current_state == self.STATE_DIFFICULTY:
+            
+            # Главное меню
+            if self.current_state == STATE_MENU:
+                if self.ui_elements['btn_start'].is_clicked(event):
+                    self.current_state = STATE_DIFFICULTY
+                elif self.ui_elements['btn_settings'].is_clicked(event):
+                    self.current_state = STATE_SETTINGS
+                elif self.ui_elements['btn_quit'].is_clicked(event):
+                    pygame.quit()
+                    sys.exit()
+            
+            # Выбор сложности
+            elif self.current_state == STATE_DIFFICULTY:
                 if self.ui_elements['btn_easy'].is_clicked(event):
                     self.game_settings['difficulty'] = 'Easy'
                     self.update_difficulty()
@@ -209,151 +156,86 @@ class Game:
                     self.update_difficulty()
                     self.reset_game()
                 elif self.ui_elements['btn_diff_back'].is_clicked(event):
-                    self.current_state = self.STATE_MENU
-
-            elif self.current_state == self.STATE_SETTINGS:
+                    self.current_state = STATE_MENU
+            
+            # Настройки
+            elif self.current_state == STATE_SETTINGS:
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     for el in self.ui_elements.values():
                         if isinstance(el, DropdownButton):
-                            if not el.rect.collidepoint(event.pos) and not any(r.collidepoint(event.pos) for _, r, _ in el.get_visible_rects()):
+                            if not el.rect.collidepoint(event.pos) and \
+                               not any(r.collidepoint(event.pos) for _, r, _ in el.get_visible_rects()):
                                 el.is_open, el.scroll_offset = False, 0
-
+                
                 res_val = self.ui_elements['dd_res'].handle_event(event)
                 if res_val:
                     self.game_settings['resolution'] = tuple(map(int, res_val.split('x')))
                     self.apply_settings()
-                    
+                
                 disp_val = self.ui_elements['dd_display'].handle_event(event)
                 if disp_val:
                     self.game_settings['display_mode'] = disp_val
                     self.apply_settings()
-
+                
                 if self.ui_elements['btn_hitboxes'].is_clicked(event):
                     self.game_settings['show_hitboxes'] = not self.game_settings['show_hitboxes']
                     hb_text = "Hitboxes: ON" if self.game_settings['show_hitboxes'] else "Hitboxes: OFF"
                     self.ui_elements['btn_hitboxes'].text = hb_text
-
-                if self.ui_elements['btn_reset'].is_clicked(event): 
+                
+                if self.ui_elements['btn_reset'].is_clicked(event):
                     self.reset_to_defaults()
-                elif self.ui_elements['btn_back'].is_clicked(event): 
-                    self.current_state = self.STATE_MENU
-
-            elif self.current_state == self.STATE_PLAYING:
+                elif self.ui_elements['btn_back'].is_clicked(event):
+                    self.current_state = STATE_MENU
+            
+            # Игра
+            elif self.current_state == STATE_PLAYING:
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     mouse_pos = pygame.mouse.get_pos()
-                    for enemy in self.enemies:
-                        if math.hypot(mouse_pos[0] - enemy.x, mouse_pos[1] - enemy.y) < enemy.hitbox_radius:
-                            enemy.is_dead = True
-                            self.score += 1
-                            break
-
-            elif self.current_state == self.STATE_PAUSED:
+                    self.gameplay.handle_click(mouse_pos)
+            
+            # Пауза
+            elif self.current_state == STATE_PAUSED:
                 action = self.pause_menu.handle_event(event)
                 if action == 'resume':
                     self.toggle_pause()
                 elif action == 'quit_to_menu':
-                    self.current_state = self.STATE_MENU
-
-            elif self.current_state == self.STATE_GAMEOVER:
-                if self.ui_elements['btn_retry'].is_clicked(event): 
+                    self.current_state = STATE_MENU
+            
+            # Конец игры
+            elif self.current_state == STATE_GAMEOVER:
+                if self.ui_elements['btn_retry'].is_clicked(event):
                     self.reset_game()
-                elif self.ui_elements['btn_menu'].is_clicked(event): 
-                    self.current_state = self.STATE_MENU
-
-    def draw(self):
-        sw, sh = self.screen.get_width(), self.screen.get_height()
-
-        if self.current_state == self.STATE_MENU:
-            self.screen.fill(MENU_BG)
-            title = self.font_large.render("DEFEND THE CORE", True, CORE_COLOR)
-            self.screen.blit(title, (sw//2 - title.get_width()//2, sh//2 - 150))
-            self.ui_elements['btn_start'].draw(self.screen)
-            self.ui_elements['btn_settings'].draw(self.screen)
-            self.ui_elements['btn_quit'].draw(self.screen)
-
-        # НОВОЕ: Отрисовка экрана выбора сложности
-        elif self.current_state == self.STATE_DIFFICULTY:
-            self.screen.fill(MENU_BG)
-            title = self.font_large.render("SELECT DIFFICULTY", True, TEXT_COLOR)
-            self.screen.blit(title, (sw//2 - title.get_width()//2, sh//2 - 120))
-            
-            self.ui_elements['btn_easy'].draw(self.screen)
-            self.ui_elements['btn_normal'].draw(self.screen)
-            self.ui_elements['btn_hard'].draw(self.screen)
-            self.ui_elements['btn_diff_back'].draw(self.screen)
-
-        elif self.current_state == self.STATE_SETTINGS:
-            self.screen.fill(MENU_BG)
-            title = self.font_large.render("SETTINGS", True, TEXT_COLOR)
-            self.screen.blit(title, (sw//2 - title.get_width()//2, sh//2 - 180))
-            self.ui_elements['dd_res'].draw(self.screen)
-            self.ui_elements['dd_display'].draw(self.screen)
-            self.ui_elements['btn_hitboxes'].draw(self.screen)
-            self.ui_elements['btn_reset'].draw(self.screen)
-            self.ui_elements['btn_back'].draw(self.screen)
-
-        elif self.current_state == self.STATE_PLAYING:
-            self.time_left -= self.dt
-            if self.time_left <= 0:
-                self.time_left, self.game_won, self.current_state = 0, True, self.STATE_GAMEOVER
-
-            self.spawn_timer += self.dt
-            if self.spawn_timer >= self.game_settings['spawn_interval']:
-                self.enemies.append(Enemy(self.game_settings, sw, sh, self.sprite_manager))
-                self.spawn_timer = 0
-                if self.game_settings['spawn_interval'] > 0.2:
-                    self.game_settings['spawn_interval'] -= 0.02
-
-            for enemy in self.enemies:
-                if enemy.update(self.dt, sw, sh, self.core):
-                    self.game_won, self.current_state = False, self.STATE_GAMEOVER
-
-            self.enemies = [e for e in self.enemies if not e.is_dead]
-            self.screen.fill(BG_COLOR)
-            
-            self.core.draw(self.screen, self.game_settings['show_hitboxes'])
-            
-            timer_text = self.font_small.render(f"TIME: {math.ceil(self.time_left)}", True, TEXT_COLOR)
-            timer_rect = timer_text.get_rect(center=(sw // 2, self.core.rect.top - 15))
-            self.screen.blit(timer_text, timer_rect)
-
-            for enemy in self.enemies:
-                enemy.draw(self.screen, self.game_settings['show_hitboxes'])
-
-            score_text = self.font_small.render(f"SCORE: {self.score}", True, TEXT_COLOR)
-            self.screen.blit(score_text, (sw - score_text.get_width() - 20, 20))
-
-        elif self.current_state == self.STATE_PAUSED:
-            self.screen.fill(BG_COLOR)
-            self.core.draw(self.screen, self.game_settings['show_hitboxes'])
-            for enemy in self.enemies:
-                enemy.draw(self.screen, self.game_settings['show_hitboxes'])
-            self.pause_menu.draw(self.screen, sw, sh, self.font_large, self.font_small)
-
-        elif self.current_state == self.STATE_GAMEOVER:
-            self.screen.fill(BG_COLOR)
-            self.core.draw(self.screen, self.game_settings['show_hitboxes'])
-            for enemy in self.enemies: 
-                enemy.draw(self.screen, self.game_settings['show_hitboxes'])
-            
-            overlay = pygame.Surface((sw, sh), pygame.SRCALPHA)
-            overlay.fill((0, 0, 0, 180))
-            self.screen.blit(overlay, (0, 0))
-
-            res_text = self.font_large.render("VICTORY!" if self.game_won else "DEFEAT", True, CORE_COLOR if self.game_won else ENEMY_COLOR)
-            self.screen.blit(res_text, (sw//2 - res_text.get_width()//2, sh//2 - 100))
-            
-            stats_text = self.font_medium.render(f"FINAL SCORE: {self.score}", True, TEXT_COLOR)
-            self.screen.blit(stats_text, (sw//2 - stats_text.get_width()//2, sh//2 - 20))
-            
-            self.ui_elements['btn_retry'].draw(self.screen)
-            self.ui_elements['btn_menu'].draw(self.screen)
-
+                elif self.ui_elements['btn_menu'].is_clicked(event):
+                    self.current_state = STATE_MENU
+    
+    def update(self, dt, sw, sh):
+        """Обновляет игровую логику (только в состоянии PLAYING)"""
+        if self.current_state == STATE_PLAYING:
+            if self.gameplay.update(dt, sw, sh):
+                self.current_state = STATE_GAMEOVER
+    
+    def draw(self, sw, sh):
+        """Отрисовывает текущее состояние"""
+        Renderer.draw(
+            self.current_state, self.screen,
+            self.asset_manager.font_small, self.asset_manager.font_medium, 
+            self.asset_manager.font_large,
+            self.ui_elements, self.core, self.gameplay.enemies,
+            self.game_settings['show_hitboxes'], self.pause_menu,
+            self.gameplay.time_left, self.gameplay.score, self.gameplay.game_won,
+            sw, sh
+        )
+    
     def run(self):
+        """Главный игровой цикл"""
         while True:
-            self.dt = self.clock.tick(FPS) / 1000.0
+            dt = self.clock.tick(FPS) / 1000.0
+            sw, sh = self.screen.get_width(), self.screen.get_height()
+            
             self.handle_events()
-            self.draw()
+            self.update(dt, sw, sh)
+            self.draw(sw, sh)
+            
             pygame.display.flip()
 
 def run():
