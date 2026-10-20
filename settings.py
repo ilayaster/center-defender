@@ -1,6 +1,6 @@
 # --- COLORS ---
-BG_COLOR = (30, 30, 30)
-MENU_BG = (20, 20, 25)
+BG_COLOR = (0, 0, 0)          # Черный фон
+MENU_BG = (0, 0, 0)           # Черный фон меню
 CORE_COLOR = (76, 175, 80)
 ENEMY_COLOR = (244, 67, 54)
 TEXT_COLOR = (255, 255, 255)

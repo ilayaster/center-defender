@@ -30,6 +30,10 @@ class Enemy:
             return True 
         return False
 
-    def draw(self, surface):
+    def draw(self, surface, show_hitboxes=False):
         self.rect.center = (int(self.x), int(self.y))
         surface.blit(self.sprite, self.rect)
+        
+        # НОВОЕ: Круглый хитбокс врага (реальный радиус коллизии)
+        if show_hitboxes:
+            pygame.draw.circle(surface, (0, 255, 0), (int(self.x), int(self.y)), int(self.radius), 2)

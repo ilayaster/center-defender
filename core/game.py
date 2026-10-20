@@ -44,7 +44,8 @@ class Game:
             'resolution': self.native_res,
             'display_mode': 'Borderless',
             'enemy_speed': 150,
-            'spawn_interval': 1.0
+            'spawn_interval': 1.0,
+            'show_hitboxes': False
         }
         self.game_settings = self.DEFAULT_SETTINGS.copy()
 
@@ -65,11 +66,22 @@ class Game:
 
     def get_fonts(self):
         sh = self.screen.get_height()
-        return (
-            pygame.font.SysFont("arial", max(16, min(22, sh // 45)), bold=True),
-            pygame.font.SysFont("arial", max(20, min(28, sh // 32)), bold=True),
-            pygame.font.SysFont("arial", max(32, min(48, sh // 18)), bold=True)
-        )
+        # УМЕНЬШЕНЫ размеры шрифтов
+        size_small = max(12, min(16, sh // 60))
+        size_medium = max(14, min(20, sh // 45))
+        size_large = max(24, min(36, sh // 25))
+        
+        try:
+            font_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "fonts", "pixel.ttf")
+            font_small = pygame.font.Font(font_path, size_small)
+            font_medium = pygame.font.Font(font_path, size_medium)
+            font_large = pygame.font.Font(font_path, size_large)
+        except FileNotFoundError:
+            font_small = pygame.font.SysFont("courier", size_small, bold=True)
+            font_medium = pygame.font.SysFont("courier", size_medium, bold=True)
+            font_large = pygame.font.SysFont("courier", size_large, bold=True)
+            
+        return font_small, font_medium, font_large
 
     def create_ui(self):
         self.ui_elements.clear()
@@ -89,8 +101,12 @@ class Game:
         
         self.ui_elements['dd_display'] = DropdownButton(cx - dd_w//2, cy + 20, dd_w, dd_h, f"Display: {self.game_settings['display_mode']}", ['Windowed', 'Fullscreen', 'Borderless'], self.font_small, sw)
         
-        self.ui_elements['btn_reset'] = Button(cx - btn_w//2, cy + 80, btn_w, btn_h, "RESET DEFAULTS", self.font_small)
-        self.ui_elements['btn_back'] = Button(cx - btn_w//2, cy + 140, btn_w, btn_h, "BACK", self.font_medium)
+        # НОВОЕ: Обычная кнопка для хитбоксов (не dropdown)
+        hb_text = "Hitboxes: ON" if self.game_settings['show_hitboxes'] else "Hitboxes: OFF"
+        self.ui_elements['btn_hitboxes'] = Button(cx - btn_w//2, cy + 80, btn_w, btn_h, hb_text, self.font_small)
+        
+        self.ui_elements['btn_reset'] = Button(cx - btn_w//2, cy + 140, btn_w, btn_h, "RESET DEFAULTS", self.font_small)
+        self.ui_elements['btn_back'] = Button(cx - btn_w//2, cy + 200, btn_w, btn_h, "BACK", self.font_medium)
         self.ui_elements['btn_retry'] = Button(cx - btn_w//2, cy + 50, btn_w, btn_h, "RETRY", self.font_medium)
         self.ui_elements['btn_menu'] = Button(cx - btn_w//2, cy + 120, btn_w, btn_h, "MAIN MENU", self.font_medium)
 
@@ -159,6 +175,12 @@ class Game:
                     self.game_settings['display_mode'] = disp_val
                     self.apply_settings()
 
+                # НОВОЕ: Обработка клика по кнопке хитбоксов (переключение)
+                if self.ui_elements['btn_hitboxes'].is_clicked(event):
+                    self.game_settings['show_hitboxes'] = not self.game_settings['show_hitboxes']
+                    hb_text = "Hitboxes: ON" if self.game_settings['show_hitboxes'] else "Hitboxes: OFF"
+                    self.ui_elements['btn_hitboxes'].text = hb_text
+
                 if self.ui_elements['btn_reset'].is_clicked(event): self.reset_to_defaults()
                 elif self.ui_elements['btn_back'].is_clicked(event): self.current_state = self.STATE_MENU
 
@@ -193,6 +215,7 @@ class Game:
             self.ui_elements['dd_diff'].draw(self.screen)
             self.ui_elements['dd_res'].draw(self.screen)
             self.ui_elements['dd_display'].draw(self.screen)
+            self.ui_elements['btn_hitboxes'].draw(self.screen)
             self.ui_elements['btn_reset'].draw(self.screen)
             self.ui_elements['btn_back'].draw(self.screen)
 
@@ -215,22 +238,38 @@ class Game:
             self.enemies = [e for e in self.enemies if not e.is_dead]
             self.screen.fill(BG_COLOR)
             
+            # Отрисовка ядра и таймера над ним
             core_sprite = self.sprite_manager.get('core')
             if core_sprite:
-                self.screen.blit(core_sprite, core_sprite.get_rect(center=(sw // 2, sh // 2)))
+                core_rect = core_sprite.get_rect(center=(sw // 2, sh // 2))
+                self.screen.blit(core_sprite, core_rect)
+                
+                # Таймер над ядром
+                timer_text = self.font_small.render(f"TIME: {math.ceil(self.time_left)}", True, TEXT_COLOR)
+                timer_rect = timer_text.get_rect(center=(sw // 2, core_rect.top - 15))
+                self.screen.blit(timer_text, timer_rect)
+                
+                # НОВОЕ: Круглый хитбокс ядра (реальный радиус коллизии)
+                if self.game_settings['show_hitboxes']:
+                    core_hitbox_radius = CORE_RADIUS * (sh / 1080.0)
+                    pygame.draw.circle(self.screen, (0, 255, 0), (sw // 2, sh // 2), int(core_hitbox_radius), 2)
 
             for enemy in self.enemies:
-                enemy.draw(self.screen)
+                enemy.draw(self.screen, self.game_settings['show_hitboxes'])
 
-            self.screen.blit(self.font_small.render(f"Time: {math.ceil(self.time_left)}", True, TEXT_COLOR), (20, 20))
-            self.screen.blit(self.font_small.render(f"Score: {self.score}", True, TEXT_COLOR), (sw - 120, 20))
+            # НОВОЕ: Счет теперь правильно позиционирован (с учетом ширины текста)
+            score_text = self.font_small.render(f"SCORE: {self.score}", True, TEXT_COLOR)
+            self.screen.blit(score_text, (sw - score_text.get_width() - 20, 20))
 
         elif self.current_state == self.STATE_GAMEOVER:
             self.screen.fill(BG_COLOR)
             core_sprite = self.sprite_manager.get('core')
             if core_sprite:
-                self.screen.blit(core_sprite, core_sprite.get_rect(center=(sw // 2, sh // 2)))
-            for enemy in self.enemies: enemy.draw(self.screen)
+                core_rect = core_sprite.get_rect(center=(sw // 2, sh // 2))
+                self.screen.blit(core_sprite, core_rect)
+                
+            for enemy in self.enemies: 
+                enemy.draw(self.screen, self.game_settings['show_hitboxes'])
             
             overlay = pygame.Surface((sw, sh), pygame.SRCALPHA)
             overlay.fill((0, 0, 0, 180))
@@ -239,7 +278,7 @@ class Game:
             res_text = self.font_large.render("VICTORY!" if self.game_won else "DEFEAT", True, CORE_COLOR if self.game_won else ENEMY_COLOR)
             self.screen.blit(res_text, (sw//2 - res_text.get_width()//2, sh//2 - 100))
             
-            stats_text = self.font_medium.render(f"Final Score: {self.score}", True, TEXT_COLOR)
+            stats_text = self.font_medium.render(f"FINAL SCORE: {self.score}", True, TEXT_COLOR)
             self.screen.blit(stats_text, (sw//2 - stats_text.get_width()//2, sh//2 - 20))
             
             self.ui_elements['btn_retry'].draw(self.screen)
