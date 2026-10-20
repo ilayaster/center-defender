@@ -1,11 +1,14 @@
 import pygame
 import sys
 import math
+import os
 from settings import *
 from ui import Button, DropdownButton
 from enemy import Enemy
 
 def run():
+    # --- CRITICAL: Center the window on the screen ---
+    os.environ['SDL_VIDEO_CENTERED'] = '1'
     pygame.init()
     
     info = pygame.display.Info()
@@ -35,7 +38,6 @@ def run():
 
     def get_fonts():
         sh = screen.get_height()
-        # --- FIXED: Reduced font sizes for a cleaner, more compact look ---
         size_small = max(16, min(22, sh // 45))
         size_medium = max(20, min(28, sh // 32))
         size_large = max(32, min(48, sh // 18))
@@ -71,7 +73,6 @@ def run():
 
     def create_ui():
         nonlocal ui_elements, font_small, font_medium
-        # --- FIXED: Clear old UI elements to prevent broken layout on resolution change ---
         ui_elements.clear() 
         
         sw, sh = screen.get_width(), screen.get_height()
@@ -80,12 +81,10 @@ def run():
         btn_w, btn_h = 200, 45
         dd_w, dd_h = 240, 40
         
-        # Menu Buttons
         ui_elements['btn_start'] = Button(cx - btn_w//2, cy - 60, btn_w, btn_h, "START GAME", font_medium)
         ui_elements['btn_settings'] = Button(cx - btn_w//2, cy + 10, btn_w, btn_h, "SETTINGS", font_medium)
         ui_elements['btn_quit'] = Button(cx - btn_w//2, cy + 80, btn_w, btn_h, "QUIT", font_medium)
         
-        # Settings Dropdowns
         ui_elements['dd_diff'] = DropdownButton(
             cx - dd_w//2, cy - 80, dd_w, dd_h, 
             f"Difficulty: {game_settings['difficulty']}", 
@@ -102,7 +101,8 @@ def run():
             f"Resolution: {current_res_text}",
             res_options,
             font_small, sw,
-            enabled=is_res_enabled
+            enabled=is_res_enabled,
+            max_visible=5 # Show max 5 resolutions at once
         )
         
         ui_elements['dd_display'] = DropdownButton(
@@ -114,7 +114,6 @@ def run():
         
         ui_elements['btn_back'] = Button(cx - btn_w//2, cy + 120, btn_w, btn_h, "BACK", font_medium)
         
-        # Game Over Buttons
         ui_elements['btn_retry'] = Button(cx - btn_w//2, cy + 50, btn_w, btn_h, "RETRY", font_medium)
         ui_elements['btn_menu'] = Button(cx - btn_w//2, cy + 120, btn_w, btn_h, "MAIN MENU", font_medium)
 
@@ -129,10 +128,13 @@ def run():
         elif game_settings['display_mode'] == 'Fullscreen':
             flags = pygame.FULLSCREEN
         else:
-            flags = 0
+            flags = 0 # Standard windowed mode with OS borders
             
         screen = pygame.display.set_mode((w, h), flags)
         pygame.display.set_caption("Defend the Core")
+        
+        # --- CRITICAL: Force SDL to process window changes immediately ---
+        pygame.event.pump() 
         
         font_small, font_medium, font_large = get_fonts()
         create_ui()
@@ -175,11 +177,16 @@ def run():
                 if ui_elements['btn_quit'].is_clicked(event): pygame.quit(); sys.exit()
 
             elif current_state == STATE_SETTINGS:
+                # Close dropdowns if clicked outside of them
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     for key, el in ui_elements.items():
                         if isinstance(el, DropdownButton):
-                            if not el.rect.collidepoint(event.pos) and not any(r.collidepoint(event.pos) for _, r in el.option_rects):
+                            visible_rects = el.get_visible_rects() if el.is_open else []
+                            in_rect = el.rect.collidepoint(event.pos)
+                            in_options = any(r.collidepoint(event.pos) for _, r, _ in visible_rects)
+                            if not in_rect and not in_options:
                                 el.is_open = False
+                                el.scroll_offset = 0
 
                 diff_val = ui_elements['dd_diff'].handle_event(event)
                 if diff_val:
