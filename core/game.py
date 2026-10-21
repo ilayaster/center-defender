@@ -44,12 +44,12 @@ class Game:
         self.gameplay = None
         self.ui_elements = {}
 
-        # Консоль разработчика и история
+        # --- Консоль разработчика и история ---
         self.console_active = False
         self.console_input = ""
-        self.console_history = []      # Список прошлых команд
-        self.history_index = -1        # -1 означает "печатаем новую команду"
-        self.temp_input = ""           # Временное хранение текста при навигации по истории
+        self.console_history = []
+        self.history_index = -1
+        self.temp_input = ""
 
         self.apply_settings()
 
@@ -89,7 +89,9 @@ class Game:
         )
 
     def reset_game(self):
+        """Сбрасывает игру и переходит в состояние PLAYING"""
         self.gameplay.reset()
+        self.weapon_manager.reset_timers()  # <-- ИСПРАВЛЕНИЕ: Сброс оружия при новом раунде
         self.current_state = STATE_PLAYING
 
     def update_difficulty(self):
@@ -112,7 +114,6 @@ class Game:
         if not cmd_str:
             return
         
-        # Сохраняем в историю (максимум 20 последних команд)
         self.console_history.append(cmd_str)
         if len(self.console_history) > 20:
             self.console_history.pop(0)
@@ -121,7 +122,7 @@ class Game:
         cmd = parts[0].lower()
         
         if cmd == "skip_time":
-            seconds = 60  # Значение по умолчанию
+            seconds = 60
             if len(parts) > 1:
                 try:
                     seconds = int(parts[1])
@@ -136,7 +137,7 @@ class Game:
                 pygame.quit()
                 sys.exit()
 
-            # --- ЛОГИКА КОНСОЛИ (приоритетная) ---
+            # --- 1. ЛОГИКА КОНСОЛИ (Приоритетная, перехватывает все клавиши) ---
             if self.current_state == STATE_PLAYING and self.console_active:
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
@@ -166,9 +167,9 @@ class Game:
                                 self.console_input = self.console_history[-(self.history_index + 1)]
                     elif event.unicode and event.unicode.isprintable():
                         self.console_input += event.unicode
-                return  # Прерываем обработку, пока открыта консоль
+                return  # Прерываем обработку остальных событий, пока консоль открыта
 
-            # --- ОБЫЧНАЯ ЛОГИКА ---
+            # --- 2. ОБЫЧНАЯ ЛОГИКА ---
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 if self.current_state in (STATE_PLAYING, STATE_PAUSED):
                     self.toggle_pause()
@@ -281,9 +282,10 @@ class Game:
             self.game_settings['show_hitboxes'], self.pause_menu,
             self.gameplay.time_survived, self.gameplay.score, self.gameplay.game_won,
             sw, sh,
-            self.console_active, self.console_input
+            self.console_active, self.console_input  # <-- Передаем состояние консоли
         )
         
+        # Рисуем оружие только если игра идет и консоль ЗАКРЫТА
         if self.current_state == STATE_PLAYING and not self.console_active:
             mouse_pos = pygame.mouse.get_pos()
             self.weapon_manager.draw(self.screen, mouse_pos)
