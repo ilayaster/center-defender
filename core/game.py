@@ -11,6 +11,7 @@ from core.ui_factory import UIFactory
 from core.gameplay import GameplayManager
 from core.renderer import Renderer
 from core.weapons import WeaponManager
+from core.effects import EffectsManager
 
 class Game:
     def __init__(self):
@@ -44,12 +45,14 @@ class Game:
         self.gameplay = None
         self.ui_elements = {}
 
-        # --- Консоль разработчика и история ---
         self.console_active = False
         self.console_input = ""
         self.console_history = []
         self.history_index = -1
         self.temp_input = ""
+
+        self.game_surface = None
+        self.effects_manager = None
 
         self.apply_settings()
 
@@ -66,6 +69,13 @@ class Game:
         self.screen = pygame.display.set_mode((w, h), flags)
         pygame.display.set_caption("Defend the Core")
         pygame.event.pump()
+
+        self.game_surface = pygame.Surface((w, h))
+        if self.effects_manager is None:
+            self.effects_manager = EffectsManager(w, h)
+        else:
+            self.effects_manager.resize(w, h)
+        self.effects_manager.mode = self.game_settings.get('effect_mode', 'OFF')
 
         self.asset_manager.load_all()
 
@@ -89,9 +99,8 @@ class Game:
         )
 
     def reset_game(self):
-        """Сбрасывает игру и переходит в состояние PLAYING"""
         self.gameplay.reset()
-        self.weapon_manager.reset_timers()  # <-- ИСПРАВЛЕНИЕ: Сброс оружия при новом раунде
+        self.weapon_manager.reset_timers()
         self.current_state = STATE_PLAYING
 
     def update_difficulty(self):
@@ -109,27 +118,20 @@ class Game:
             self.current_state = STATE_PLAYING
 
     def _execute_console_command(self):
-        """Обрабатывает команды консоли"""
         cmd_str = self.console_input.strip()
-        if not cmd_str:
-            return
+        if not cmd_str: return
         
         self.console_history.append(cmd_str)
-        if len(self.console_history) > 20:
-            self.console_history.pop(0)
+        if len(self.console_history) > 20: self.console_history.pop(0)
         
         parts = cmd_str.split()
         cmd = parts[0].lower()
-        
         if cmd == "skip_time":
             seconds = 60
             if len(parts) > 1:
-                try:
-                    seconds = int(parts[1])
-                except ValueError:
-                    pass
+                try: seconds = int(parts[1])
+                except ValueError: pass
             self.gameplay.time_survived += seconds
-            print(f"[Console] Time skipped by {seconds}s. Current: {self.gameplay.time_survived:.1f}s")
 
     def handle_events(self):
         for event in pygame.event.get():
@@ -137,7 +139,6 @@ class Game:
                 pygame.quit()
                 sys.exit()
 
-            # --- 1. ЛОГИКА КОНСОЛИ (Приоритетная, перехватывает все клавиши) ---
             if self.current_state == STATE_PLAYING and self.console_active:
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
@@ -154,31 +155,25 @@ class Game:
                         self.console_input = self.console_input[:-1]
                     elif event.key == pygame.K_UP:
                         if self.console_history:
-                            if self.history_index == -1:
-                                self.temp_input = self.console_input
+                            if self.history_index == -1: self.temp_input = self.console_input
                             self.history_index = min(self.history_index + 1, len(self.console_history) - 1)
                             self.console_input = self.console_history[-(self.history_index + 1)]
                     elif event.key == pygame.K_DOWN:
                         if self.history_index > -1:
                             self.history_index -= 1
-                            if self.history_index == -1:
-                                self.console_input = self.temp_input
-                            else:
-                                self.console_input = self.console_history[-(self.history_index + 1)]
+                            if self.history_index == -1: self.console_input = self.temp_input
+                            else: self.console_input = self.console_history[-(self.history_index + 1)]
                     elif event.unicode and event.unicode.isprintable():
                         self.console_input += event.unicode
-                return  # Прерываем обработку остальных событий, пока консоль открыта
+                return
 
-            # --- 2. ОБЫЧНАЯ ЛОГИКА ---
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 if self.current_state in (STATE_PLAYING, STATE_PAUSED):
                     self.toggle_pause()
 
             if self.current_state == STATE_MENU:
-                if self.ui_elements['btn_start'].is_clicked(event):
-                    self.current_state = STATE_WEAPON_SELECT
-                elif self.ui_elements['btn_settings'].is_clicked(event):
-                    self.current_state = STATE_SETTINGS
+                if self.ui_elements['btn_start'].is_clicked(event): self.current_state = STATE_WEAPON_SELECT
+                elif self.ui_elements['btn_settings'].is_clicked(event): self.current_state = STATE_SETTINGS
                 elif self.ui_elements['btn_quit'].is_clicked(event):
                     pygame.quit()
                     sys.exit()
@@ -193,8 +188,7 @@ class Game:
                 elif self.ui_elements['btn_weapon_pistol'].is_clicked(event):
                     self.weapon_manager.set_weapon('pistol')
                     self.current_state = STATE_DIFFICULTY
-                elif self.ui_elements['btn_wep_back'].is_clicked(event):
-                    self.current_state = STATE_MENU
+                elif self.ui_elements['btn_wep_back'].is_clicked(event): self.current_state = STATE_MENU
 
             elif self.current_state == STATE_DIFFICULTY:
                 if self.ui_elements['btn_easy'].is_clicked(event):
@@ -209,8 +203,7 @@ class Game:
                     self.game_settings['difficulty'] = 'Hard'
                     self.update_difficulty()
                     self.reset_game()
-                elif self.ui_elements['btn_diff_back'].is_clicked(event):
-                    self.current_state = STATE_WEAPON_SELECT
+                elif self.ui_elements['btn_diff_back'].is_clicked(event): self.current_state = STATE_WEAPON_SELECT
 
             elif self.current_state == STATE_SETTINGS:
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -230,6 +223,14 @@ class Game:
                     self.game_settings['display_mode'] = disp_val
                     self.apply_settings()
 
+                # Обработка Dropdown эффектов с обновлением текста кнопки
+                eff_val = self.ui_elements['dd_effects'].handle_event(event)
+                if eff_val:
+                    self.game_settings['effect_mode'] = eff_val
+                    self.ui_elements['dd_effects'].text = f"Effects: {eff_val}"
+                    if self.effects_manager:
+                        self.effects_manager.mode = eff_val
+
                 if self.ui_elements['btn_hitboxes'].is_clicked(event):
                     self.game_settings['show_hitboxes'] = not self.game_settings['show_hitboxes']
                     hb_text = "Hitboxes: ON" if self.game_settings['show_hitboxes'] else "Hitboxes: OFF"
@@ -246,49 +247,45 @@ class Game:
                         self.console_active = True
                     elif event.key == pygame.K_r:
                         self.weapon_manager.request_reload()
-
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     self.weapon_manager.request_attack()
 
             elif self.current_state == STATE_PAUSED:
                 action = self.pause_menu.handle_event(event)
-                if action == 'resume':
-                    self.toggle_pause()
-                elif action == 'quit_to_menu':
-                    self.current_state = STATE_MENU
+                if action == 'resume': self.toggle_pause()
+                elif action == 'quit_to_menu': self.current_state = STATE_MENU
 
             elif self.current_state == STATE_GAMEOVER:
-                if self.ui_elements['btn_retry'].is_clicked(event):
-                    self.reset_game()
-                elif self.ui_elements['btn_menu'].is_clicked(event):
-                    self.current_state = STATE_MENU
+                if self.ui_elements['btn_retry'].is_clicked(event): self.reset_game()
+                elif self.ui_elements['btn_menu'].is_clicked(event): self.current_state = STATE_MENU
 
     def update(self, dt, sw, sh):
         if self.current_state == STATE_PLAYING:
             mouse_pos = pygame.mouse.get_pos()
             hits = self.weapon_manager.update(dt, mouse_pos, self.gameplay.enemies)
-            if hits > 0:
-                self.gameplay.score += hits
-                
+            if hits > 0: self.gameplay.score += hits
             if self.gameplay.update(dt, sw, sh):
                 self.current_state = STATE_GAMEOVER
 
     def draw(self, sw, sh):
         Renderer.draw(
-            self.current_state, self.screen,
+            self.current_state, self.game_surface,
             self.asset_manager.font_small, self.asset_manager.font_medium,
             self.asset_manager.font_large,
             self.ui_elements, self.core, self.gameplay.enemies,
             self.game_settings['show_hitboxes'], self.pause_menu,
             self.gameplay.time_survived, self.gameplay.score, self.gameplay.game_won,
-            sw, sh,
-            self.console_active, self.console_input  # <-- Передаем состояние консоли
+            sw, sh, self.console_active, self.console_input
         )
         
-        # Рисуем оружие только если игра идет и консоль ЗАКРЫТА
         if self.current_state == STATE_PLAYING and not self.console_active:
             mouse_pos = pygame.mouse.get_pos()
-            self.weapon_manager.draw(self.screen, mouse_pos)
+            self.weapon_manager.draw(self.game_surface, mouse_pos)
+            
+        if self.effects_manager:
+            self.effects_manager.apply(self.game_surface)
+            
+        self.screen.blit(self.game_surface, (0, 0))
 
     def run(self):
         while True:

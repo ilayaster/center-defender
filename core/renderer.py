@@ -38,9 +38,10 @@ class Renderer:
     def draw_settings_screen(screen, font_large, ui_elements, sw, sh):
         screen.fill(MENU_BG)
         title = font_large.render("SETTINGS", True, TEXT_COLOR)
-        screen.blit(title, (sw//2 - title.get_width()//2, sh//2 - 180))
+        screen.blit(title, (sw//2 - title.get_width()//2, sh//2 - 220))
         ui_elements['dd_res'].draw(screen)
         ui_elements['dd_display'].draw(screen)
+        ui_elements['dd_effects'].draw(screen)
         ui_elements['btn_hitboxes'].draw(screen)
         ui_elements['btn_reset'].draw(screen)
         ui_elements['btn_back'].draw(screen)
@@ -49,7 +50,6 @@ class Renderer:
     def draw_playing(screen, font_small, font_medium, ui_elements, core, enemies, 
                      show_hitboxes, time_survived, score, sw, sh, console_active, console_input):
         screen.fill(BG_COLOR)
-        
         core.draw(screen, show_hitboxes)
         for enemy in enemies:
             enemy.draw(screen, show_hitboxes)
@@ -63,12 +63,10 @@ class Renderer:
         score_text = font_small.render(f"SCORE: {score}", True, TEXT_COLOR)
         screen.blit(score_text, (sw // 2 - score_text.get_width() // 2, 55))
 
-        # Отрисовка консоли разработчика
         if console_active:
             overlay = pygame.Surface((sw, 40), pygame.SRCALPHA)
             overlay.fill((0, 0, 0, 200))
             screen.blit(overlay, (0, sh - 40))
-            
             console_text = font_small.render(f"> {console_input}_", True, (0, 255, 0))
             screen.blit(console_text, (10, sh - 30))
 
