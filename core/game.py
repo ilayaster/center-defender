@@ -19,7 +19,6 @@ class Game:
         self.info = pygame.display.Info()
         self.native_res = (self.info.current_w, self.info.current_h)
         
-        # Фильтрация доступных разрешений
         self.available_resolutions = []
         seen = set()
         for w, h in STANDARD_RESOLUTIONS:
@@ -30,35 +29,31 @@ class Game:
             self.available_resolutions.append(self.native_res)
         self.available_resolutions.sort(key=lambda x: (x[0], x[1]))
 
-        # Инициализация экрана
         self.screen = pygame.display.set_mode(self.native_res, pygame.RESIZABLE)
         pygame.display.set_caption("Defend the Core")
         self.clock = pygame.time.Clock()
 
-        # Менеджеры
         self.sprite_manager = SpriteManager()
         self.asset_manager = AssetManager(self.sprite_manager, self.screen)
         self.pause_menu = PauseMenu()
         self.weapon_manager = WeaponManager()
 
-        # Настройки
         self.game_settings = get_default_settings(self.native_res)
-
-        # Состояние
         self.current_state = STATE_MENU
-
-        # Игровые объекты
         self.core = None
         self.gameplay = None
-
-        # UI
         self.ui_elements = {}
 
-        # Загрузка и применение настроек
+        # Консоль разработчика и история
+        self.console_active = False
+        self.console_input = ""
+        self.console_history = []      # Список прошлых команд
+        self.history_index = -1        # -1 означает "печатаем новую команду"
+        self.temp_input = ""           # Временное хранение текста при навигации по истории
+
         self.apply_settings()
 
     def apply_settings(self):
-        """Применяет настройки экрана и загружает ресурсы"""
         w, h = self.game_settings['resolution']
         if self.game_settings['display_mode'] == 'Borderless':
             flags, w, h = pygame.NOFRAME, self.native_res[0], self.native_res[1]
@@ -72,20 +67,16 @@ class Game:
         pygame.display.set_caption("Defend the Core")
         pygame.event.pump()
 
-        # Загрузка ресурсов
         self.asset_manager.load_all()
 
-        # Создание ядра
         if self.core is None:
             self.core = Core(w, h, self.sprite_manager)
         else:
             self.core.update_size(w, h, self.sprite_manager)
 
-        # Создание менеджера геймплея
         if self.gameplay is None:
             self.gameplay = GameplayManager(self.game_settings, self.core, self.sprite_manager)
 
-        # Создание UI
         sw, sh = self.screen.get_width(), self.screen.get_height()
         cx, cy = sw // 2, sh // 2
         btn_w, btn_h, dd_w, dd_h = 200, 45, 240, 40
@@ -98,40 +89,90 @@ class Game:
         )
 
     def reset_game(self):
-        """Сбрасывает игру и переходит в состояние PLAYING"""
         self.gameplay.reset()
         self.current_state = STATE_PLAYING
 
     def update_difficulty(self):
-        """Обновляет параметры сложности"""
         self.gameplay.update_difficulty()
 
     def reset_to_defaults(self):
-        """Сбрасывает настройки к значениям по умолчанию"""
         self.game_settings = get_default_settings(self.native_res)
         self.update_difficulty()
         self.apply_settings()
 
     def toggle_pause(self):
-        """Переключает паузу"""
         if self.current_state == STATE_PLAYING:
             self.current_state = STATE_PAUSED
         elif self.current_state == STATE_PAUSED:
             self.current_state = STATE_PLAYING
 
+    def _execute_console_command(self):
+        """Обрабатывает команды консоли"""
+        cmd_str = self.console_input.strip()
+        if not cmd_str:
+            return
+        
+        # Сохраняем в историю (максимум 20 последних команд)
+        self.console_history.append(cmd_str)
+        if len(self.console_history) > 20:
+            self.console_history.pop(0)
+        
+        parts = cmd_str.split()
+        cmd = parts[0].lower()
+        
+        if cmd == "skip_time":
+            seconds = 60  # Значение по умолчанию
+            if len(parts) > 1:
+                try:
+                    seconds = int(parts[1])
+                except ValueError:
+                    pass
+            self.gameplay.time_survived += seconds
+            print(f"[Console] Time skipped by {seconds}s. Current: {self.gameplay.time_survived:.1f}s")
+
     def handle_events(self):
-        """Обрабатывает все события"""
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
 
-            # ESC для паузы
+            # --- ЛОГИКА КОНСОЛИ (приоритетная) ---
+            if self.current_state == STATE_PLAYING and self.console_active:
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        self.console_active = False
+                        self.console_input = ""
+                        self.history_index = -1
+                    elif event.key == pygame.K_RETURN:
+                        self._execute_console_command()
+                        self.console_active = False
+                        self.console_input = ""
+                        self.history_index = -1
+                        self.temp_input = ""
+                    elif event.key == pygame.K_BACKSPACE:
+                        self.console_input = self.console_input[:-1]
+                    elif event.key == pygame.K_UP:
+                        if self.console_history:
+                            if self.history_index == -1:
+                                self.temp_input = self.console_input
+                            self.history_index = min(self.history_index + 1, len(self.console_history) - 1)
+                            self.console_input = self.console_history[-(self.history_index + 1)]
+                    elif event.key == pygame.K_DOWN:
+                        if self.history_index > -1:
+                            self.history_index -= 1
+                            if self.history_index == -1:
+                                self.console_input = self.temp_input
+                            else:
+                                self.console_input = self.console_history[-(self.history_index + 1)]
+                    elif event.unicode and event.unicode.isprintable():
+                        self.console_input += event.unicode
+                return  # Прерываем обработку, пока открыта консоль
+
+            # --- ОБЫЧНАЯ ЛОГИКА ---
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 if self.current_state in (STATE_PLAYING, STATE_PAUSED):
                     self.toggle_pause()
 
-            # Главное меню
             if self.current_state == STATE_MENU:
                 if self.ui_elements['btn_start'].is_clicked(event):
                     self.current_state = STATE_WEAPON_SELECT
@@ -141,7 +182,6 @@ class Game:
                     pygame.quit()
                     sys.exit()
 
-            # Выбор оружия
             elif self.current_state == STATE_WEAPON_SELECT:
                 if self.ui_elements['btn_weapon_sword'].is_clicked(event):
                     self.weapon_manager.set_weapon('sword')
@@ -149,14 +189,12 @@ class Game:
                 elif self.ui_elements['btn_weapon_hammer'].is_clicked(event):
                     self.weapon_manager.set_weapon('hammer')
                     self.current_state = STATE_DIFFICULTY
-                # <-- ДОБАВЛЕНА ОБРАБОТКА КЛИКА ПО ПИСТОЛЕТУ
                 elif self.ui_elements['btn_weapon_pistol'].is_clicked(event):
                     self.weapon_manager.set_weapon('pistol')
                     self.current_state = STATE_DIFFICULTY
                 elif self.ui_elements['btn_wep_back'].is_clicked(event):
                     self.current_state = STATE_MENU
 
-            # Выбор сложности
             elif self.current_state == STATE_DIFFICULTY:
                 if self.ui_elements['btn_easy'].is_clicked(event):
                     self.game_settings['difficulty'] = 'Easy'
@@ -173,7 +211,6 @@ class Game:
                 elif self.ui_elements['btn_diff_back'].is_clicked(event):
                     self.current_state = STATE_WEAPON_SELECT
 
-            # Настройки
             elif self.current_state == STATE_SETTINGS:
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     for el in self.ui_elements.values():
@@ -202,13 +239,16 @@ class Game:
                 elif self.ui_elements['btn_back'].is_clicked(event):
                     self.current_state = STATE_MENU
 
-            # Игра
             elif self.current_state == STATE_PLAYING:
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_SLASH or event.key == pygame.K_KP_DIVIDE:
+                        self.console_active = True
+                    elif event.key == pygame.K_r:
+                        self.weapon_manager.request_reload()
+
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    # Просто запрашиваем атаку, фактический урон нанесется в update() после windup
                     self.weapon_manager.request_attack()
 
-            # Пауза
             elif self.current_state == STATE_PAUSED:
                 action = self.pause_menu.handle_event(event)
                 if action == 'resume':
@@ -216,7 +256,6 @@ class Game:
                 elif action == 'quit_to_menu':
                     self.current_state = STATE_MENU
 
-            # Конец игры
             elif self.current_state == STATE_GAMEOVER:
                 if self.ui_elements['btn_retry'].is_clicked(event):
                     self.reset_game()
@@ -224,10 +263,8 @@ class Game:
                     self.current_state = STATE_MENU
 
     def update(self, dt, sw, sh):
-        """Обновляет игровую логику (только в состоянии PLAYING)"""
         if self.current_state == STATE_PLAYING:
             mouse_pos = pygame.mouse.get_pos()
-            # WeaponManager обновляет таймеры и возвращает количество убитых врагов, если windup завершился
             hits = self.weapon_manager.update(dt, mouse_pos, self.gameplay.enemies)
             if hits > 0:
                 self.gameplay.score += hits
@@ -236,24 +273,22 @@ class Game:
                 self.current_state = STATE_GAMEOVER
 
     def draw(self, sw, sh):
-        """Отрисовывает текущее состояние"""
         Renderer.draw(
             self.current_state, self.screen,
             self.asset_manager.font_small, self.asset_manager.font_medium,
             self.asset_manager.font_large,
             self.ui_elements, self.core, self.gameplay.enemies,
             self.game_settings['show_hitboxes'], self.pause_menu,
-            self.gameplay.time_left, self.gameplay.score, self.gameplay.game_won,
-            sw, sh
+            self.gameplay.time_survived, self.gameplay.score, self.gameplay.game_won,
+            sw, sh,
+            self.console_active, self.console_input
         )
         
-        # Отрисовка оружия/курсора поверх всего (только в игре)
-        if self.current_state == STATE_PLAYING:
+        if self.current_state == STATE_PLAYING and not self.console_active:
             mouse_pos = pygame.mouse.get_pos()
             self.weapon_manager.draw(self.screen, mouse_pos)
 
     def run(self):
-        """Главный игровой цикл"""
         while True:
             dt = self.clock.tick(FPS) / 1000.0
             sw, sh = self.screen.get_width(), self.screen.get_height()

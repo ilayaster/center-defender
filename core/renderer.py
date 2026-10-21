@@ -5,11 +5,8 @@ from core.constants import (STATE_MENU, STATE_DIFFICULTY, STATE_SETTINGS,
                             STATE_PLAYING, STATE_PAUSED, STATE_GAMEOVER, STATE_WEAPON_SELECT)
 
 class Renderer:
-    """Отвечает за отрисовку всех экранов игры"""
-
     @staticmethod
     def draw_main_menu(screen, font_large, ui_elements, sw, sh):
-        """Отрисовывает главное меню"""
         screen.fill(MENU_BG)
         title = font_large.render("DEFEND THE CORE", True, CORE_COLOR)
         screen.blit(title, (sw//2 - title.get_width()//2, sh//2 - 150))
@@ -19,7 +16,6 @@ class Renderer:
 
     @staticmethod
     def draw_weapon_select_screen(screen, font_large, ui_elements, sw, sh):
-        """Отрисовывает экран выбора оружия"""
         screen.fill(MENU_BG)
         title = font_large.render("SELECT WEAPON", True, TEXT_COLOR)
         screen.blit(title, (sw//2 - title.get_width()//2, sh//2 - 120))
@@ -30,7 +26,6 @@ class Renderer:
 
     @staticmethod
     def draw_difficulty_screen(screen, font_large, ui_elements, sw, sh):
-        """Отрисовывает экран выбора сложности"""
         screen.fill(MENU_BG)
         title = font_large.render("SELECT DIFFICULTY", True, TEXT_COLOR)
         screen.blit(title, (sw//2 - title.get_width()//2, sh//2 - 120))
@@ -41,7 +36,6 @@ class Renderer:
 
     @staticmethod
     def draw_settings_screen(screen, font_large, ui_elements, sw, sh):
-        """Отрисовывает экран настроек"""
         screen.fill(MENU_BG)
         title = font_large.render("SETTINGS", True, TEXT_COLOR)
         screen.blit(title, (sw//2 - title.get_width()//2, sh//2 - 180))
@@ -52,23 +46,35 @@ class Renderer:
         ui_elements['btn_back'].draw(screen)
 
     @staticmethod
-    def draw_playing(screen, font_small, ui_elements, core, enemies, 
-                     show_hitboxes, time_left, score, sw, sh):
-        """Отрисовывает игровой процесс"""
+    def draw_playing(screen, font_small, font_medium, ui_elements, core, enemies, 
+                     show_hitboxes, time_survived, score, sw, sh, console_active, console_input):
         screen.fill(BG_COLOR)
+        
         core.draw(screen, show_hitboxes)
-        timer_text = font_small.render(f"TIME: {math.ceil(time_left)}", True, TEXT_COLOR)
-        timer_rect = timer_text.get_rect(center=(sw // 2, core.rect.top - 15))
-        screen.blit(timer_text, timer_rect)
         for enemy in enemies:
             enemy.draw(screen, show_hitboxes)
+            
+        mins = int(time_survived // 60)
+        secs = int(time_survived % 60)
+        time_str = f"TIME: {mins}:{secs:02d}"
+        time_text = font_medium.render(time_str, True, TEXT_COLOR)
+        screen.blit(time_text, (sw // 2 - time_text.get_width() // 2, 20))
+        
         score_text = font_small.render(f"SCORE: {score}", True, TEXT_COLOR)
-        screen.blit(score_text, (sw - score_text.get_width() - 20, 20))
+        screen.blit(score_text, (sw // 2 - score_text.get_width() // 2, 55))
+
+        # Отрисовка консоли разработчика
+        if console_active:
+            overlay = pygame.Surface((sw, 40), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, 200))
+            screen.blit(overlay, (0, sh - 40))
+            
+            console_text = font_small.render(f"> {console_input}_", True, (0, 255, 0))
+            screen.blit(console_text, (10, sh - 30))
 
     @staticmethod
     def draw_paused(screen, font_large, font_small, ui_elements, core, enemies, 
                     show_hitboxes, pause_menu, sw, sh):
-        """Отрисовывает экран паузы"""
         screen.fill(BG_COLOR)
         core.draw(screen, show_hitboxes)
         for enemy in enemies:
@@ -78,7 +84,6 @@ class Renderer:
     @staticmethod
     def draw_gameover(screen, font_large, font_medium, ui_elements, core, enemies, 
                       show_hitboxes, game_won, score, sw, sh):
-        """Отрисовывает экран конца игры"""
         screen.fill(BG_COLOR)
         core.draw(screen, show_hitboxes)
         for enemy in enemies:
@@ -96,8 +101,8 @@ class Renderer:
 
     @classmethod
     def draw(cls, state, screen, font_small, font_medium, font_large, ui_elements,
-             core, enemies, show_hitboxes, pause_menu, time_left, score, game_won, sw, sh):
-        """Главный метод отрисовки, делегирует вызов нужному экрану"""
+             core, enemies, show_hitboxes, pause_menu, time_survived, score, game_won, sw, sh,
+             console_active=False, console_input=""):
         if state == STATE_MENU:
             cls.draw_main_menu(screen, font_large, ui_elements, sw, sh)
         elif state == STATE_WEAPON_SELECT:
@@ -107,8 +112,8 @@ class Renderer:
         elif state == STATE_SETTINGS:
             cls.draw_settings_screen(screen, font_large, ui_elements, sw, sh)
         elif state == STATE_PLAYING:
-            cls.draw_playing(screen, font_small, ui_elements, core, enemies,
-                           show_hitboxes, time_left, score, sw, sh)
+            cls.draw_playing(screen, font_small, font_medium, ui_elements, core, enemies,
+                           show_hitboxes, time_survived, score, sw, sh, console_active, console_input)
         elif state == STATE_PAUSED:
             cls.draw_paused(screen, font_large, font_small, ui_elements, core, enemies,
                           show_hitboxes, pause_menu, sw, sh)

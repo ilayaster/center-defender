@@ -11,7 +11,11 @@ class Enemy:
         self.speed = settings['enemy_speed'] * (screen_h / 1080)
         
         angle = random.uniform(0, 2 * math.pi)
-        distance = max(screen_w, screen_h)
+        
+        # ИСПРАВЛЕНИЕ: расстояние от центра до угла экрана + 50 пикселей запаса
+        # Это гарантирует, что враг появится ровно за видимой границей, а не где-то в километре от неё
+        distance = math.hypot(screen_w / 2, screen_h / 2) + 50
+        
         self.x = (screen_w // 2) + math.cos(angle) * distance
         self.y = (screen_h // 2) + math.sin(angle) * distance
         self.is_dead = False
@@ -20,7 +24,7 @@ class Enemy:
         self.rect = self.sprite.get_rect()
 
     def update(self, dt, screen_w, screen_h, core):
-        """Теперь принимает объект core для проверки коллизии"""
+        """Обновляет позицию врага и проверяет коллизию с ядром"""
         center_x, center_y = screen_w // 2, screen_h // 2
         dx, dy = center_x - self.x, center_y - self.y
         dist = math.hypot(dx, dy)
@@ -29,7 +33,7 @@ class Enemy:
             self.x += (dx / dist) * self.speed * dt
             self.y += (dy / dist) * self.speed * dt
 
-        # Используем hitbox_radius из core для проверки столкновения
+        # Проверка столкновения с ядром
         if dist < core.hitbox_radius + self.hitbox_radius:
             return True 
         return False
@@ -39,4 +43,5 @@ class Enemy:
         surface.blit(self.sprite, self.rect)
         
         if show_hitboxes:
-            pygame.draw.circle(surface, (0, 255, 0), (int(self.x), int(self.y)), int(self.hitbox_radius), 2)
+            # Красный цвет для хитбокса врага, чтобы отличать от зеленого хитбокса ядра
+            pygame.draw.circle(surface, (255, 0, 0), (int(self.x), int(self.y)), int(self.hitbox_radius), 2)
