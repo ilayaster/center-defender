@@ -5,6 +5,7 @@ STATE_SETTINGS = 2
 STATE_PLAYING = 3
 STATE_GAMEOVER = 4
 STATE_PAUSED = 5
+STATE_WEAPON_SELECT = 6  # <-- НОВОЕ СОСТОЯНИЕ
 
 # Стандартные разрешения
 STANDARD_RESOLUTIONS = [

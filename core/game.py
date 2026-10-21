@@ -10,7 +10,7 @@ from core.assets import AssetManager
 from core.ui_factory import UIFactory
 from core.gameplay import GameplayManager
 from core.renderer import Renderer
-from core.weapons import WeaponManager # <-- НОВЫЙ ИМПОРТ
+from core.weapons import WeaponManager
 
 class Game:
     def __init__(self):
@@ -39,7 +39,7 @@ class Game:
         self.sprite_manager = SpriteManager()
         self.asset_manager = AssetManager(self.sprite_manager, self.screen)
         self.pause_menu = PauseMenu()
-        self.weapon_manager = WeaponManager() # <-- ИНИЦИАЛИЗАЦИЯ ОРУЖИЯ
+        self.weapon_manager = WeaponManager()
 
         # Настройки
         self.game_settings = get_default_settings(self.native_res)
@@ -134,12 +134,27 @@ class Game:
             # Главное меню
             if self.current_state == STATE_MENU:
                 if self.ui_elements['btn_start'].is_clicked(event):
-                    self.current_state = STATE_DIFFICULTY
+                    self.current_state = STATE_WEAPON_SELECT
                 elif self.ui_elements['btn_settings'].is_clicked(event):
                     self.current_state = STATE_SETTINGS
                 elif self.ui_elements['btn_quit'].is_clicked(event):
                     pygame.quit()
                     sys.exit()
+
+            # Выбор оружия
+            elif self.current_state == STATE_WEAPON_SELECT:
+                if self.ui_elements['btn_weapon_sword'].is_clicked(event):
+                    self.weapon_manager.set_weapon('sword')
+                    self.current_state = STATE_DIFFICULTY
+                elif self.ui_elements['btn_weapon_hammer'].is_clicked(event):
+                    self.weapon_manager.set_weapon('hammer')
+                    self.current_state = STATE_DIFFICULTY
+                # <-- ДОБАВЛЕНА ОБРАБОТКА КЛИКА ПО ПИСТОЛЕТУ
+                elif self.ui_elements['btn_weapon_pistol'].is_clicked(event):
+                    self.weapon_manager.set_weapon('pistol')
+                    self.current_state = STATE_DIFFICULTY
+                elif self.ui_elements['btn_wep_back'].is_clicked(event):
+                    self.current_state = STATE_MENU
 
             # Выбор сложности
             elif self.current_state == STATE_DIFFICULTY:
@@ -156,7 +171,7 @@ class Game:
                     self.update_difficulty()
                     self.reset_game()
                 elif self.ui_elements['btn_diff_back'].is_clicked(event):
-                    self.current_state = STATE_MENU
+                    self.current_state = STATE_WEAPON_SELECT
 
             # Настройки
             elif self.current_state == STATE_SETTINGS:
@@ -190,11 +205,8 @@ class Game:
             # Игра
             elif self.current_state == STATE_PLAYING:
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    mouse_pos = pygame.mouse.get_pos()
-                    # <-- НОВАЯ ЛОГИКА АТАКИ ЧЕРЕЗ WEAPON MANAGER
-                    hits = self.weapon_manager.attack(mouse_pos, self.gameplay.enemies)
-                    if hits > 0:
-                        self.gameplay.score += hits
+                    # Просто запрашиваем атаку, фактический урон нанесется в update() после windup
+                    self.weapon_manager.request_attack()
 
             # Пауза
             elif self.current_state == STATE_PAUSED:
@@ -214,7 +226,12 @@ class Game:
     def update(self, dt, sw, sh):
         """Обновляет игровую логику (только в состоянии PLAYING)"""
         if self.current_state == STATE_PLAYING:
-            self.weapon_manager.update(dt) # <-- ОБНОВЛЕНИЕ ОРУЖИЯ
+            mouse_pos = pygame.mouse.get_pos()
+            # WeaponManager обновляет таймеры и возвращает количество убитых врагов, если windup завершился
+            hits = self.weapon_manager.update(dt, mouse_pos, self.gameplay.enemies)
+            if hits > 0:
+                self.gameplay.score += hits
+                
             if self.gameplay.update(dt, sw, sh):
                 self.current_state = STATE_GAMEOVER
 
@@ -230,7 +247,7 @@ class Game:
             sw, sh
         )
         
-        # <-- ОТРИСОВКА ОРУЖИЯ/КУРСОРА ПОВЕРХ ВСЕГО (только в игре)
+        # Отрисовка оружия/курсора поверх всего (только в игре)
         if self.current_state == STATE_PLAYING:
             mouse_pos = pygame.mouse.get_pos()
             self.weapon_manager.draw(self.screen, mouse_pos)
