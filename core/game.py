@@ -325,7 +325,8 @@ class Game:
             self.ui_elements, self.core, self.gameplay.enemies,
             self.game_settings['show_hitboxes'], self.pause_menu,
             self.gameplay.time_survived, self.gameplay.score, self.gameplay.game_won,
-            sw, sh, self.console_active, self.console_input
+            sw, sh, self.console_active, self.console_input,
+            self.sprite_manager  # <-- ДОБАВЛЕНО: передаем менеджер спрайтов
         )
         
         if self.current_state == STATE_PLAYING and not self.console_active:

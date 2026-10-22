@@ -1,5 +1,6 @@
 import pygame
 import math
+import os
 
 CORE_HITBOX_BASE_RADIUS_PLOSIVE = 40
 CORE_HITBOX_BASE_RADIUS_SLOW = 60
@@ -15,25 +16,42 @@ class Core:
         if self.core_type == 'plosive':
             self.max_hp = 5
             self.hitbox_radius = CORE_HITBOX_BASE_RADIUS_PLOSIVE * scale
-            self.explosion_radius = 300 * scale  # <-- УВЕЛИЧЕН В 2 РАЗА (было 150)
+            self.explosion_radius = 300 * scale
             self.regen_time_per_hp = 60.0
-        else:  # slow
+            sprite_name = 'core-plosive'
+        else:
             self.max_hp = 3
             self.hitbox_radius = CORE_HITBOX_BASE_RADIUS_SLOW * scale
             self.slow_radius = 280 * scale
             self.slow_factor = 0.5
             self.regen_time_per_hp = 80.0
+            sprite_name = 'slow-core'
             
         self.current_hp = self.max_hp
         self.regen_timer = 0.0
         self.damage_cooldown = 0.0
         
-        self.sprite = sprite_manager.get('core')
+        # Загружаем и масштабируем спрайт в 2 раза
+        self.sprite = sprite_manager.get(sprite_name)
+        if self.sprite is None:
+            sprite_path = f"sprites/{sprite_name}.png"
+            if os.path.exists(sprite_path):
+                self.sprite = pygame.image.load(sprite_path).convert_alpha()
+        
+        # Масштабируем в 2 раза с Nearest Neighbor
+        if self.sprite:
+            original_width = self.sprite.get_width()
+            original_height = self.sprite.get_height()
+            self.sprite = pygame.transform.scale(
+                self.sprite, 
+                (original_width * 3, original_height * 3)
+            )
+            
         self.rect = self.sprite.get_rect(center=(self.x, self.y))
         
         self.explosion_active = False
         self.explosion_timer = 0.0
-        self.explosion_duration = 0.3  # Чуть дольше вспышка для большого радиуса
+        self.explosion_duration = 0.3
 
     def update_size(self, screen_w, screen_h, sprite_manager):
         self.x = screen_w // 2
@@ -43,11 +61,27 @@ class Core:
         if self.core_type == 'plosive':
             self.hitbox_radius = CORE_HITBOX_BASE_RADIUS_PLOSIVE * scale
             self.explosion_radius = 300 * scale
+            sprite_name = 'core-plosive'
         else:
             self.hitbox_radius = CORE_HITBOX_BASE_RADIUS_SLOW * scale
             self.slow_radius = 280 * scale
+            sprite_name = 'slow-core'
             
-        self.sprite = sprite_manager.get('core')
+        self.sprite = sprite_manager.get(sprite_name)
+        if self.sprite is None:
+            sprite_path = f"sprites/{sprite_name}.png"
+            if os.path.exists(sprite_path):
+                self.sprite = pygame.image.load(sprite_path).convert_alpha()
+        
+        # Масштабируем в 2 раза
+        if self.sprite:
+            original_width = self.sprite.get_width()
+            original_height = self.sprite.get_height()
+            self.sprite = pygame.transform.scale(
+                self.sprite, 
+                (original_width * 2, original_height * 2)
+            )
+            
         self.rect = self.sprite.get_rect(center=(self.x, self.y))
 
     def apply_effects(self, enemies, dt):

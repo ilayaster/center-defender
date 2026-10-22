@@ -31,10 +31,11 @@ class UIFactory:
         actual_btn_w = 200
         total_width = actual_btn_w * 2 + spacing
         start_x = cx - total_width // 2
+        # <-- СДВИНУЛИ КНОПКИ ВНИЗ (cy + 80 и cy + 140), чтобы освободить центр (cy) для спрайта
         return {
-            'btn_core_plosive': Button(start_x, cy - 30, actual_btn_w, btn_h, "CORE-PLOSIVE", font_medium),
-            'btn_core_slow': Button(start_x + actual_btn_w + spacing, cy - 30, actual_btn_w, btn_h, "SLOW-CORE", font_medium),
-            'btn_core_back': Button(cx - btn_w // 2, cy + 60, btn_w, btn_h, "BACK", font_medium)
+            'btn_core_plosive': Button(start_x, cy + 80, actual_btn_w, btn_h, "CORE-PLOSIVE", font_medium),
+            'btn_core_slow': Button(start_x + actual_btn_w + spacing, cy + 80, actual_btn_w, btn_h, "SLOW-CORE", font_medium),
+            'btn_core_back': Button(cx - btn_w // 2, cy + 150, btn_w, btn_h, "BACK", font_medium)
         }
 
     @staticmethod
@@ -61,7 +62,6 @@ class UIFactory:
         sfx_vol = game_settings.get('sfx_volume', 0.5)
         mus_vol = game_settings.get('music_volume', 0.5)
         
-        # Сдвинули элементы вниз, чтобы вместить два слайдера
         return {
             'dd_res': DropdownButton(cx - dd_w // 2, cy - 120, dd_w, dd_h,
                                      f"Resolution: {current_res_text}", res_options,
@@ -75,7 +75,7 @@ class UIFactory:
                                          ['OFF', 'RETRO', 'RETROIER'],
                                          font_small, sw),
             'slider_volume': Slider(cx - dd_w // 2, cy + 60, dd_w, 20, 0.0, 1.0, sfx_vol, font_small, "SFX Volume"),
-            'slider_music_volume': Slider(cx - dd_w // 2, cy + 110, dd_w, 20, 0.0, 1.0, mus_vol, font_small, "Music Volume"), # <-- НОВЫЙ СЛАЙДЕР
+            'slider_music_volume': Slider(cx - dd_w // 2, cy + 110, dd_w, 20, 0.0, 1.0, mus_vol, font_small, "Music Volume"),
             'btn_hitboxes': Button(cx - btn_w // 2, cy + 160, btn_w, btn_h, hb_text, font_small),
             'btn_reset': Button(cx - btn_w // 2, cy + 210, btn_w, btn_h, "RESET DEFAULTS", font_small),
             'btn_back': Button(cx - btn_w // 2, cy + 270, btn_w, btn_h, "BACK", font_medium)
