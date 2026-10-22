@@ -15,7 +15,7 @@ class Core:
         if self.core_type == 'plosive':
             self.max_hp = 5
             self.hitbox_radius = CORE_HITBOX_BASE_RADIUS_PLOSIVE * scale
-            self.explosion_radius = 150 * scale
+            self.explosion_radius = 300 * scale  # <-- УВЕЛИЧЕН В 2 РАЗА (было 150)
             self.regen_time_per_hp = 60.0
         else:  # slow
             self.max_hp = 3
@@ -33,7 +33,7 @@ class Core:
         
         self.explosion_active = False
         self.explosion_timer = 0.0
-        self.explosion_duration = 0.2
+        self.explosion_duration = 0.3  # Чуть дольше вспышка для большого радиуса
 
     def update_size(self, screen_w, screen_h, sprite_manager):
         self.x = screen_w // 2
@@ -42,7 +42,7 @@ class Core:
         
         if self.core_type == 'plosive':
             self.hitbox_radius = CORE_HITBOX_BASE_RADIUS_PLOSIVE * scale
-            self.explosion_radius = 150 * scale
+            self.explosion_radius = 300 * scale
         else:
             self.hitbox_radius = CORE_HITBOX_BASE_RADIUS_SLOW * scale
             self.slow_radius = 280 * scale
@@ -51,18 +51,15 @@ class Core:
         self.rect = self.sprite.get_rect(center=(self.x, self.y))
 
     def apply_effects(self, enemies, dt):
-        # 1. Обновление кулдауна получения урона
         if self.damage_cooldown > 0:
             self.damage_cooldown -= dt
             
-        # 2. Регенерация здоровья
         if self.current_hp < self.max_hp:
             self.regen_timer += dt
             if self.regen_timer >= self.regen_time_per_hp:
                 self.current_hp += 1
                 self.regen_timer = 0.0
                 
-        # 3. Замедление врагов
         if self.core_type == 'slow':
             for enemy in enemies:
                 if enemy.is_dead:
@@ -74,20 +71,18 @@ class Core:
                 else:
                     enemy.is_slowed = False
                     
-        # 4. Таймер визуального эффекта взрыва
         if self.explosion_active:
             self.explosion_timer -= dt
             if self.explosion_timer <= 0:
                 self.explosion_active = False
 
     def on_hit(self, enemies):
-        # Если ядро в кулдауне, урон не проходит
         if self.damage_cooldown > 0:
             return 0
             
         self.current_hp -= 1
         self.regen_timer = 0.0
-        self.damage_cooldown = 0.75  # <-- ИЗМЕНЕНО: 0.75 секунды неуязвимости
+        self.damage_cooldown = 0.75
         
         kills = 0
         if self.core_type == 'plosive':
@@ -101,7 +96,6 @@ class Core:
                     enemy.is_dead = True
                     kills += 1
         else:
-            # Для Slow-core: <-- ИЗМЕНЕНО: убиваем врагов, которые коснулись ядра
             for enemy in enemies:
                 if enemy.is_dead:
                     continue
@@ -113,7 +107,6 @@ class Core:
         return kills
 
     def draw(self, surface, show_hitboxes=False):
-        # Рисуем полупрозрачные радиусы действия
         if self.core_type == 'plosive':
             explosion_surf = pygame.Surface((int(self.explosion_radius * 2), int(self.explosion_radius * 2)), pygame.SRCALPHA)
             pygame.draw.circle(explosion_surf, (255, 100, 50, 30), (int(self.explosion_radius), int(self.explosion_radius)), int(self.explosion_radius))

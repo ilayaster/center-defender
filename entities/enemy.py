@@ -24,7 +24,6 @@ class Enemy:
         self.rect = self.sprite.get_rect()
 
     def update(self, dt, screen_w, screen_h, core):
-        # Мертвые враги не двигаются и не наносят урон
         if self.is_dead:
             return False
 
@@ -40,20 +39,14 @@ class Enemy:
             self.x += (dx / dist) * current_speed * dt
             self.y += (dy / dist) * current_speed * dt
 
-        # Проверка столкновения
         if dist < core.hitbox_radius + self.hitbox_radius:
             return True 
         return False
 
     def draw(self, surface, show_hitboxes=False):
         self.rect.center = (int(self.x), int(self.y))
-        
-        if self.is_slowed:
-            slowed_sprite = self.sprite.copy()
-            slowed_sprite.fill((100, 150, 255, 100), special_flags=pygame.BLEND_RGBA_MULT)
-            surface.blit(slowed_sprite, self.rect)
-        else:
-            surface.blit(self.sprite, self.rect)
+        # <-- УДАЛЕНО затемнение спрайта. Рисуем как есть.
+        surface.blit(self.sprite, self.rect)
         
         if show_hitboxes:
             color = (100, 100, 255) if self.is_slowed else (255, 0, 0)

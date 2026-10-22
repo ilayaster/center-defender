@@ -47,7 +47,7 @@ class Game:
         self.core = None
         self.gameplay = None
         self.ui_elements = {}
-        self.selected_core_type = 'plosive'  # <-- ДОБАВЛЕНО: хранение выбора игрока
+        self.selected_core_type = 'plosive'
 
         self.console_active = False
         self.console_input = ""
@@ -103,14 +103,25 @@ class Game:
         )
         
         self.weapon_manager.set_volume(self.game_settings.get('sfx_volume', 0.5))
+        # Применяем громкость музыки при инициализации/смене настроек
+        pygame.mixer.music.set_volume(self.game_settings.get('music_volume', 0.5))
 
     def reset_game(self):
-        # Пересоздаем ядро и геймплей при новом раунде, сохраняя выбранный тип ядра
         sw, sh = self.screen.get_width(), self.screen.get_height()
         self.core = Core(sw, sh, self.sprite_manager, core_type=self.selected_core_type)
         self.gameplay = GameplayManager(self.game_settings, self.core, self.sprite_manager)
         self.weapon_manager.reset_timers()
         self.current_state = STATE_PLAYING
+        
+        # <-- ЗАПУСК МУЗЫКИ ПРИ НАЧАЛЕ РАУНДА
+        music_path = "music/music_round_1.wav"
+        if os.path.exists(music_path):
+            pygame.mixer.music.load(music_path)
+            pygame.mixer.music.set_volume(self.game_settings.get('music_volume', 0.5))
+            pygame.mixer.music.play(-1) # -1 означает бесконечный цикл
+
+    def stop_music(self):
+        pygame.mixer.music.stop()
 
     def update_difficulty(self):
         if self.gameplay:
@@ -124,8 +135,10 @@ class Game:
     def toggle_pause(self):
         if self.current_state == STATE_PLAYING:
             self.current_state = STATE_PAUSED
+            pygame.mixer.music.pause() # <-- ПАУЗА МУЗЫКИ
         elif self.current_state == STATE_PAUSED:
             self.current_state = STATE_PLAYING
+            pygame.mixer.music.unpause() # <-- ВОЗОБНОВЛЕНИЕ МУЗЫКИ
 
     def _execute_console_command(self):
         cmd_str = self.console_input.strip()
@@ -182,8 +195,11 @@ class Game:
                     self.toggle_pause()
 
             if self.current_state == STATE_MENU:
-                if self.ui_elements['btn_start'].is_clicked(event): self.current_state = STATE_WEAPON_SELECT
-                elif self.ui_elements['btn_settings'].is_clicked(event): self.current_state = STATE_SETTINGS
+                if self.ui_elements['btn_start'].is_clicked(event): 
+                    self.current_state = STATE_WEAPON_SELECT
+                    self.stop_music() # Останавливаем музыку, если она вдруг играла
+                elif self.ui_elements['btn_settings'].is_clicked(event): 
+                    self.current_state = STATE_SETTINGS
                 elif self.ui_elements['btn_quit'].is_clicked(event):
                     pygame.quit()
                     sys.exit()
@@ -191,17 +207,17 @@ class Game:
             elif self.current_state == STATE_WEAPON_SELECT:
                 if self.ui_elements['btn_weapon_sword'].is_clicked(event):
                     self.weapon_manager.set_weapon('sword')
-                    self.current_state = STATE_CORE_SELECT  # <-- ИЗМЕНЕНО
+                    self.current_state = STATE_CORE_SELECT
                 elif self.ui_elements['btn_weapon_hammer'].is_clicked(event):
                     self.weapon_manager.set_weapon('hammer')
-                    self.current_state = STATE_CORE_SELECT  # <-- ИЗМЕНЕНО
+                    self.current_state = STATE_CORE_SELECT
                 elif self.ui_elements['btn_weapon_pistol'].is_clicked(event):
                     self.weapon_manager.set_weapon('pistol')
-                    self.current_state = STATE_CORE_SELECT  # <-- ИЗМЕНЕНО
+                    self.current_state = STATE_CORE_SELECT
                 elif self.ui_elements['btn_wep_back'].is_clicked(event): 
                     self.current_state = STATE_MENU
 
-            elif self.current_state == STATE_CORE_SELECT:  # <-- ДОБАВЛЕНО
+            elif self.current_state == STATE_CORE_SELECT:
                 if self.ui_elements['btn_core_plosive'].is_clicked(event):
                     self.selected_core_type = 'plosive'
                     self.current_state = STATE_DIFFICULTY
@@ -222,12 +238,17 @@ class Game:
                     self.game_settings['difficulty'] = 'Hard'
                     self.reset_game()
                 elif self.ui_elements['btn_diff_back'].is_clicked(event): 
-                    self.current_state = STATE_CORE_SELECT  # <-- ИЗМЕНЕНО (возврат на выбор ядра)
+                    self.current_state = STATE_CORE_SELECT
 
             elif self.current_state == STATE_SETTINGS:
                 if self.ui_elements['slider_volume'].handle_event(event):
                     self.game_settings['sfx_volume'] = self.ui_elements['slider_volume'].value
                     self.weapon_manager.set_volume(self.game_settings['sfx_volume'])
+                
+                # <-- ОБРАБОТКА НОВОГО СЛАЙДЕРА МУЗЫКИ
+                if self.ui_elements['slider_music_volume'].handle_event(event):
+                    self.game_settings['music_volume'] = self.ui_elements['slider_music_volume'].value
+                    pygame.mixer.music.set_volume(self.game_settings['music_volume'])
                 
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     for el in self.ui_elements.values():
@@ -276,11 +297,16 @@ class Game:
             elif self.current_state == STATE_PAUSED:
                 action = self.pause_menu.handle_event(event)
                 if action == 'resume': self.toggle_pause()
-                elif action == 'quit_to_menu': self.current_state = STATE_MENU
+                elif action == 'quit_to_menu': 
+                    self.current_state = STATE_MENU
+                    self.stop_music()
 
             elif self.current_state == STATE_GAMEOVER:
-                if self.ui_elements['btn_retry'].is_clicked(event): self.reset_game()
-                elif self.ui_elements['btn_menu'].is_clicked(event): self.current_state = STATE_MENU
+                if self.ui_elements['btn_retry'].is_clicked(event): 
+                    self.reset_game()
+                elif self.ui_elements['btn_menu'].is_clicked(event): 
+                    self.current_state = STATE_MENU
+                    self.stop_music()
 
     def update(self, dt, sw, sh):
         if self.current_state == STATE_PLAYING:
@@ -289,6 +315,7 @@ class Game:
             if hits > 0: self.gameplay.score += hits
             if self.gameplay.update(dt, sw, sh):
                 self.current_state = STATE_GAMEOVER
+                self.stop_music() # Останавливаем музыку при проигрыше/выигрыше
 
     def draw(self, sw, sh):
         Renderer.draw(

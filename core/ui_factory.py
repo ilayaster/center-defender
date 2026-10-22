@@ -59,23 +59,26 @@ class UIFactory:
         hb_text = "Hitboxes: ON" if game_settings['show_hitboxes'] else "Hitboxes: OFF"
         current_eff = game_settings.get('effect_mode', 'OFF')
         sfx_vol = game_settings.get('sfx_volume', 0.5)
+        mus_vol = game_settings.get('music_volume', 0.5)
         
+        # Сдвинули элементы вниз, чтобы вместить два слайдера
         return {
-            'dd_res': DropdownButton(cx - dd_w // 2, cy - 100, dd_w, dd_h,
+            'dd_res': DropdownButton(cx - dd_w // 2, cy - 120, dd_w, dd_h,
                                      f"Resolution: {current_res_text}", res_options,
                                      font_small, sw, enabled=is_res_enabled, max_visible=6),
-            'dd_display': DropdownButton(cx - dd_w // 2, cy - 40, dd_w, dd_h,
+            'dd_display': DropdownButton(cx - dd_w // 2, cy - 60, dd_w, dd_h,
                                          f"Display: {game_settings['display_mode']}",
                                          ['Windowed', 'Fullscreen', 'Borderless'],
                                          font_small, sw),
-            'dd_effects': DropdownButton(cx - dd_w // 2, cy + 20, dd_w, dd_h,
+            'dd_effects': DropdownButton(cx - dd_w // 2, cy, dd_w, dd_h,
                                          f"Effects: {current_eff}",
                                          ['OFF', 'RETRO', 'RETROIER'],
                                          font_small, sw),
-            'slider_volume': Slider(cx - dd_w // 2, cy + 80, dd_w, 20, 0.0, 1.0, sfx_vol, font_small, "SFX Volume"),
-            'btn_hitboxes': Button(cx - btn_w // 2, cy + 130, btn_w, btn_h, hb_text, font_small),
-            'btn_reset': Button(cx - btn_w // 2, cy + 190, btn_w, btn_h, "RESET DEFAULTS", font_small),
-            'btn_back': Button(cx - btn_w // 2, cy + 250, btn_w, btn_h, "BACK", font_medium)
+            'slider_volume': Slider(cx - dd_w // 2, cy + 60, dd_w, 20, 0.0, 1.0, sfx_vol, font_small, "SFX Volume"),
+            'slider_music_volume': Slider(cx - dd_w // 2, cy + 110, dd_w, 20, 0.0, 1.0, mus_vol, font_small, "Music Volume"), # <-- НОВЫЙ СЛАЙДЕР
+            'btn_hitboxes': Button(cx - btn_w // 2, cy + 160, btn_w, btn_h, hb_text, font_small),
+            'btn_reset': Button(cx - btn_w // 2, cy + 210, btn_w, btn_h, "RESET DEFAULTS", font_small),
+            'btn_back': Button(cx - btn_w // 2, cy + 270, btn_w, btn_h, "BACK", font_medium)
         }
 
     @staticmethod
@@ -91,7 +94,7 @@ class UIFactory:
         ui_elements = {}
         ui_elements.update(UIFactory.create_main_menu(cx, cy, btn_w, btn_h, font_medium))
         ui_elements.update(UIFactory.create_weapon_select_screen(cx, cy, btn_w, btn_h, font_medium))
-        ui_elements.update(UIFactory.create_core_select_screen(cx, cy, btn_w, btn_h, font_medium))  # <-- ДОБАВЛЕНО
+        ui_elements.update(UIFactory.create_core_select_screen(cx, cy, btn_w, btn_h, font_medium))
         ui_elements.update(UIFactory.create_difficulty_screen(cx, cy, btn_w, btn_h, font_medium))
         ui_elements.update(UIFactory.create_settings_screen(
             cx, cy, btn_w, btn_h, dd_w, dd_h, font_small, font_medium,

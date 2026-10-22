@@ -66,7 +66,7 @@ WEAPONS = {
     'pistol': {
         'name': 'PISTOL', 'cooldown': 0.15, 'windup_duration': 0.0, 'swing_duration': 0.1,
         'range': 40, 'swing_color': (255, 255, 0), 'cursor_color': (200, 200, 255),
-        'magazine_size': 6, 'reload_duration': 1.5  # Базовое время для полной перезарядки
+        'magazine_size': 6, 'reload_duration': 1.5
     }
 }
 
@@ -84,6 +84,7 @@ def get_default_settings(native_res):
         'difficulty': 'Normal',
         'show_hitboxes': False,
         'effect_mode': 'OFF',
-        'sfx_volume': 0.5,  # <-- НОВЫЙ ПАРАМЕТР (от 0.0 до 1.0)
+        'sfx_volume': 0.5,
+        'music_volume': 0.5,  # <-- НОВЫЙ ПАРАМЕТР
         'enemy_speed': 150.0
     }
