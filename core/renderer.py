@@ -38,10 +38,11 @@ class Renderer:
     def draw_settings_screen(screen, font_large, ui_elements, sw, sh):
         screen.fill(MENU_BG)
         title = font_large.render("SETTINGS", True, TEXT_COLOR)
-        screen.blit(title, (sw//2 - title.get_width()//2, sh//2 - 220))
+        screen.blit(title, (sw//2 - title.get_width()//2, sh//2 - 240))
         ui_elements['dd_res'].draw(screen)
         ui_elements['dd_display'].draw(screen)
         ui_elements['dd_effects'].draw(screen)
+        ui_elements['slider_volume'].draw(screen)
         ui_elements['btn_hitboxes'].draw(screen)
         ui_elements['btn_reset'].draw(screen)
         ui_elements['btn_back'].draw(screen)

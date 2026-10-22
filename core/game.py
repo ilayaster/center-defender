@@ -17,6 +17,7 @@ class Game:
     def __init__(self):
         os.environ['SDL_VIDEO_CENTERED'] = '1'
         pygame.init()
+        pygame.mixer.init()
         self.info = pygame.display.Info()
         self.native_res = (self.info.current_w, self.info.current_h)
         
@@ -97,6 +98,8 @@ class Game:
             self.available_resolutions, self.native_res, self.game_settings, sw,
             self.pause_menu
         )
+        
+        self.weapon_manager.set_volume(self.game_settings.get('sfx_volume', 0.5))
 
     def reset_game(self):
         self.gameplay.reset()
@@ -206,6 +209,10 @@ class Game:
                 elif self.ui_elements['btn_diff_back'].is_clicked(event): self.current_state = STATE_WEAPON_SELECT
 
             elif self.current_state == STATE_SETTINGS:
+                if self.ui_elements['slider_volume'].handle_event(event):
+                    self.game_settings['sfx_volume'] = self.ui_elements['slider_volume'].value
+                    self.weapon_manager.set_volume(self.game_settings['sfx_volume'])
+                
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     for el in self.ui_elements.values():
                         if isinstance(el, DropdownButton):
@@ -223,7 +230,6 @@ class Game:
                     self.game_settings['display_mode'] = disp_val
                     self.apply_settings()
 
-                # Обработка Dropdown эффектов с обновлением текста кнопки
                 eff_val = self.ui_elements['dd_effects'].handle_event(event)
                 if eff_val:
                     self.game_settings['effect_mode'] = eff_val
@@ -248,7 +254,9 @@ class Game:
                     elif event.key == pygame.K_r:
                         self.weapon_manager.request_reload()
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    self.weapon_manager.request_attack()
+                    # <-- ПЕРЕДАЕМ ПОЗИЦИЮ МЫШИ В МОМЕНТ КЛИКА
+                    mouse_pos = pygame.mouse.get_pos()
+                    self.weapon_manager.request_attack(mouse_pos)
 
             elif self.current_state == STATE_PAUSED:
                 action = self.pause_menu.handle_event(event)

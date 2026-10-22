@@ -1,4 +1,5 @@
 from ui import Button, DropdownButton, PauseMenu
+from ui.slider import Slider
 from core.constants import STATE_MENU, STATE_DIFFICULTY, STATE_SETTINGS, STATE_WEAPON_SELECT
 
 class UIFactory:
@@ -44,6 +45,7 @@ class UIFactory:
         is_res_enabled = game_settings['display_mode'] != 'Borderless'
         hb_text = "Hitboxes: ON" if game_settings['show_hitboxes'] else "Hitboxes: OFF"
         current_eff = game_settings.get('effect_mode', 'OFF')
+        sfx_vol = game_settings.get('sfx_volume', 0.5)
         
         return {
             'dd_res': DropdownButton(cx - dd_w // 2, cy - 100, dd_w, dd_h,
@@ -57,9 +59,10 @@ class UIFactory:
                                          f"Effects: {current_eff}",
                                          ['OFF', 'RETRO', 'RETROIER'],
                                          font_small, sw),
-            'btn_hitboxes': Button(cx - btn_w // 2, cy + 80, btn_w, btn_h, hb_text, font_small),
-            'btn_reset': Button(cx - btn_w // 2, cy + 140, btn_w, btn_h, "RESET DEFAULTS", font_small),
-            'btn_back': Button(cx - btn_w // 2, cy + 200, btn_w, btn_h, "BACK", font_medium)
+            'slider_volume': Slider(cx - dd_w // 2, cy + 80, dd_w, 20, 0.0, 1.0, sfx_vol, font_small, "SFX Volume"),
+            'btn_hitboxes': Button(cx - btn_w // 2, cy + 130, btn_w, btn_h, hb_text, font_small),
+            'btn_reset': Button(cx - btn_w // 2, cy + 190, btn_w, btn_h, "RESET DEFAULTS", font_small),
+            'btn_back': Button(cx - btn_w // 2, cy + 250, btn_w, btn_h, "BACK", font_medium)
         }
 
     @staticmethod
