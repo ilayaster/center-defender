@@ -5,7 +5,8 @@ STATE_SETTINGS = 2
 STATE_PLAYING = 3
 STATE_GAMEOVER = 4
 STATE_PAUSED = 5
-STATE_WEAPON_SELECT = 6  # <-- НОВОЕ СОСТОЯНИЕ
+STATE_WEAPON_SELECT = 6
+STATE_CORE_SELECT = 7  # <-- НОВОЕ СОСТОЯНИЕ
 
 # Стандартные разрешения
 STANDARD_RESOLUTIONS = [
@@ -22,7 +23,9 @@ def get_default_settings(native_res):
         'display_mode': 'Borderless',
         'enemy_speed': 150,
         'spawn_interval': 1.0,
-        'show_hitboxes': False
+        'show_hitboxes': False,
+        'effect_mode': 'OFF',
+        'sfx_volume': 0.5
     }
 
 # Параметры сложности

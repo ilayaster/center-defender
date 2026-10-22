@@ -1,6 +1,8 @@
+import os
+os.environ['SDL_RENDER_SCALE_QUALITY'] = 'nearest'
+
 import pygame
 import sys
-import os
 from settings import *
 from ui import DropdownButton, PauseMenu
 from entities import Core
@@ -45,6 +47,7 @@ class Game:
         self.core = None
         self.gameplay = None
         self.ui_elements = {}
+        self.selected_core_type = 'plosive'  # <-- ДОБАВЛЕНО: хранение выбора игрока
 
         self.console_active = False
         self.console_input = ""
@@ -81,7 +84,7 @@ class Game:
         self.asset_manager.load_all()
 
         if self.core is None:
-            self.core = Core(w, h, self.sprite_manager)
+            self.core = Core(w, h, self.sprite_manager, core_type=self.selected_core_type)
         else:
             self.core.update_size(w, h, self.sprite_manager)
 
@@ -102,12 +105,16 @@ class Game:
         self.weapon_manager.set_volume(self.game_settings.get('sfx_volume', 0.5))
 
     def reset_game(self):
-        self.gameplay.reset()
+        # Пересоздаем ядро и геймплей при новом раунде, сохраняя выбранный тип ядра
+        sw, sh = self.screen.get_width(), self.screen.get_height()
+        self.core = Core(sw, sh, self.sprite_manager, core_type=self.selected_core_type)
+        self.gameplay = GameplayManager(self.game_settings, self.core, self.sprite_manager)
         self.weapon_manager.reset_timers()
         self.current_state = STATE_PLAYING
 
     def update_difficulty(self):
-        self.gameplay.update_difficulty()
+        if self.gameplay:
+            self.gameplay.update_difficulty()
 
     def reset_to_defaults(self):
         self.game_settings = get_default_settings(self.native_res)
@@ -184,29 +191,38 @@ class Game:
             elif self.current_state == STATE_WEAPON_SELECT:
                 if self.ui_elements['btn_weapon_sword'].is_clicked(event):
                     self.weapon_manager.set_weapon('sword')
-                    self.current_state = STATE_DIFFICULTY
+                    self.current_state = STATE_CORE_SELECT  # <-- ИЗМЕНЕНО
                 elif self.ui_elements['btn_weapon_hammer'].is_clicked(event):
                     self.weapon_manager.set_weapon('hammer')
-                    self.current_state = STATE_DIFFICULTY
+                    self.current_state = STATE_CORE_SELECT  # <-- ИЗМЕНЕНО
                 elif self.ui_elements['btn_weapon_pistol'].is_clicked(event):
                     self.weapon_manager.set_weapon('pistol')
+                    self.current_state = STATE_CORE_SELECT  # <-- ИЗМЕНЕНО
+                elif self.ui_elements['btn_wep_back'].is_clicked(event): 
+                    self.current_state = STATE_MENU
+
+            elif self.current_state == STATE_CORE_SELECT:  # <-- ДОБАВЛЕНО
+                if self.ui_elements['btn_core_plosive'].is_clicked(event):
+                    self.selected_core_type = 'plosive'
                     self.current_state = STATE_DIFFICULTY
-                elif self.ui_elements['btn_wep_back'].is_clicked(event): self.current_state = STATE_MENU
+                elif self.ui_elements['btn_core_slow'].is_clicked(event):
+                    self.selected_core_type = 'slow'
+                    self.current_state = STATE_DIFFICULTY
+                elif self.ui_elements['btn_core_back'].is_clicked(event): 
+                    self.current_state = STATE_WEAPON_SELECT
 
             elif self.current_state == STATE_DIFFICULTY:
                 if self.ui_elements['btn_easy'].is_clicked(event):
                     self.game_settings['difficulty'] = 'Easy'
-                    self.update_difficulty()
                     self.reset_game()
                 elif self.ui_elements['btn_normal'].is_clicked(event):
                     self.game_settings['difficulty'] = 'Normal'
-                    self.update_difficulty()
                     self.reset_game()
                 elif self.ui_elements['btn_hard'].is_clicked(event):
                     self.game_settings['difficulty'] = 'Hard'
-                    self.update_difficulty()
                     self.reset_game()
-                elif self.ui_elements['btn_diff_back'].is_clicked(event): self.current_state = STATE_WEAPON_SELECT
+                elif self.ui_elements['btn_diff_back'].is_clicked(event): 
+                    self.current_state = STATE_CORE_SELECT  # <-- ИЗМЕНЕНО (возврат на выбор ядра)
 
             elif self.current_state == STATE_SETTINGS:
                 if self.ui_elements['slider_volume'].handle_event(event):
@@ -254,7 +270,6 @@ class Game:
                     elif event.key == pygame.K_r:
                         self.weapon_manager.request_reload()
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    # <-- ПЕРЕДАЕМ ПОЗИЦИЮ МЫШИ В МОМЕНТ КЛИКА
                     mouse_pos = pygame.mouse.get_pos()
                     self.weapon_manager.request_attack(mouse_pos)
 

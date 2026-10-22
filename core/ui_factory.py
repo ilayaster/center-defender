@@ -1,6 +1,7 @@
 from ui import Button, DropdownButton, PauseMenu
 from ui.slider import Slider
-from core.constants import STATE_MENU, STATE_DIFFICULTY, STATE_SETTINGS, STATE_WEAPON_SELECT
+from core.constants import (STATE_MENU, STATE_DIFFICULTY, STATE_SETTINGS, 
+                            STATE_PLAYING, STATE_PAUSED, STATE_GAMEOVER, STATE_WEAPON_SELECT, STATE_CORE_SELECT)
 
 class UIFactory:
     @staticmethod
@@ -22,6 +23,18 @@ class UIFactory:
             'btn_weapon_hammer': Button(start_x + actual_btn_w + spacing, cy - 30, actual_btn_w, btn_h, "HAMMER", font_medium),
             'btn_weapon_pistol': Button(start_x + (actual_btn_w + spacing) * 2, cy - 30, actual_btn_w, btn_h, "PISTOL", font_medium),
             'btn_wep_back': Button(cx - btn_w // 2, cy + 60, btn_w, btn_h, "BACK", font_medium)
+        }
+
+    @staticmethod
+    def create_core_select_screen(cx, cy, btn_w, btn_h, font_medium):
+        spacing = 30
+        actual_btn_w = 200
+        total_width = actual_btn_w * 2 + spacing
+        start_x = cx - total_width // 2
+        return {
+            'btn_core_plosive': Button(start_x, cy - 30, actual_btn_w, btn_h, "CORE-PLOSIVE", font_medium),
+            'btn_core_slow': Button(start_x + actual_btn_w + spacing, cy - 30, actual_btn_w, btn_h, "SLOW-CORE", font_medium),
+            'btn_core_back': Button(cx - btn_w // 2, cy + 60, btn_w, btn_h, "BACK", font_medium)
         }
 
     @staticmethod
@@ -78,6 +91,7 @@ class UIFactory:
         ui_elements = {}
         ui_elements.update(UIFactory.create_main_menu(cx, cy, btn_w, btn_h, font_medium))
         ui_elements.update(UIFactory.create_weapon_select_screen(cx, cy, btn_w, btn_h, font_medium))
+        ui_elements.update(UIFactory.create_core_select_screen(cx, cy, btn_w, btn_h, font_medium))  # <-- ДОБАВЛЕНО
         ui_elements.update(UIFactory.create_difficulty_screen(cx, cy, btn_w, btn_h, font_medium))
         ui_elements.update(UIFactory.create_settings_screen(
             cx, cy, btn_w, btn_h, dd_w, dd_h, font_small, font_medium,
