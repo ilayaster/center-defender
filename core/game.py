@@ -6,7 +6,7 @@ import sys
 from settings import *
 from ui import DropdownButton, PauseMenu
 from entities import Core
-from utils import SpriteManager
+from utils.sprite_manager import SpriteManager # <-- Убедись, что импорт правильный
 from core.constants import *
 from core.assets import AssetManager
 from core.ui_factory import UIFactory
@@ -82,6 +82,9 @@ class Game:
         self.effects_manager.mode = self.game_settings.get('effect_mode', 'OFF')
 
         self.asset_manager.load_all()
+        
+        # <-- НОВОЕ: Загрузка анимаций врагов при инициализации/смене настроек
+        self.sprite_manager.load_enemy_animations("enemies")
 
         if self.core is None:
             self.core = Core(w, h, self.sprite_manager, core_type=self.selected_core_type)
@@ -103,7 +106,6 @@ class Game:
         )
         
         self.weapon_manager.set_volume(self.game_settings.get('sfx_volume', 0.5))
-        # Применяем громкость музыки при инициализации/смене настроек
         pygame.mixer.music.set_volume(self.game_settings.get('music_volume', 0.5))
 
     def reset_game(self):
@@ -113,12 +115,11 @@ class Game:
         self.weapon_manager.reset_timers()
         self.current_state = STATE_PLAYING
         
-        # <-- ЗАПУСК МУЗЫКИ ПРИ НАЧАЛЕ РАУНДА
         music_path = "music/music_round_1.wav"
         if os.path.exists(music_path):
             pygame.mixer.music.load(music_path)
             pygame.mixer.music.set_volume(self.game_settings.get('music_volume', 0.5))
-            pygame.mixer.music.play(-1) # -1 означает бесконечный цикл
+            pygame.mixer.music.play(-1)
 
     def stop_music(self):
         pygame.mixer.music.stop()
@@ -135,10 +136,10 @@ class Game:
     def toggle_pause(self):
         if self.current_state == STATE_PLAYING:
             self.current_state = STATE_PAUSED
-            pygame.mixer.music.pause() # <-- ПАУЗА МУЗЫКИ
+            pygame.mixer.music.pause()
         elif self.current_state == STATE_PAUSED:
             self.current_state = STATE_PLAYING
-            pygame.mixer.music.unpause() # <-- ВОЗОБНОВЛЕНИЕ МУЗЫКИ
+            pygame.mixer.music.unpause()
 
     def _execute_console_command(self):
         cmd_str = self.console_input.strip()
@@ -197,7 +198,7 @@ class Game:
             if self.current_state == STATE_MENU:
                 if self.ui_elements['btn_start'].is_clicked(event): 
                     self.current_state = STATE_WEAPON_SELECT
-                    self.stop_music() # Останавливаем музыку, если она вдруг играла
+                    self.stop_music()
                 elif self.ui_elements['btn_settings'].is_clicked(event): 
                     self.current_state = STATE_SETTINGS
                 elif self.ui_elements['btn_quit'].is_clicked(event):
@@ -245,7 +246,6 @@ class Game:
                     self.game_settings['sfx_volume'] = self.ui_elements['slider_volume'].value
                     self.weapon_manager.set_volume(self.game_settings['sfx_volume'])
                 
-                # <-- ОБРАБОТКА НОВОГО СЛАЙДЕРА МУЗЫКИ
                 if self.ui_elements['slider_music_volume'].handle_event(event):
                     self.game_settings['music_volume'] = self.ui_elements['slider_music_volume'].value
                     pygame.mixer.music.set_volume(self.game_settings['music_volume'])
@@ -315,7 +315,7 @@ class Game:
             if hits > 0: self.gameplay.score += hits
             if self.gameplay.update(dt, sw, sh):
                 self.current_state = STATE_GAMEOVER
-                self.stop_music() # Останавливаем музыку при проигрыше/выигрыше
+                self.stop_music()
 
     def draw(self, sw, sh):
         Renderer.draw(
@@ -326,7 +326,7 @@ class Game:
             self.game_settings['show_hitboxes'], self.pause_menu,
             self.gameplay.time_survived, self.gameplay.score, self.gameplay.game_won,
             sw, sh, self.console_active, self.console_input,
-            self.sprite_manager  # <-- ДОБАВЛЕНО: передаем менеджер спрайтов
+            self.sprite_manager
         )
         
         if self.current_state == STATE_PLAYING and not self.console_active:

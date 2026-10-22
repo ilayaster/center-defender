@@ -15,10 +15,8 @@ class WeaponManager:
     def _load_font(self):
         """Загружает пиксельный шрифт для UI оружия"""
         try:
-            # Уменьшаем размер до 14, чтобы текст не был огромным
             self.reload_font = pygame.font.Font('fonts/pixel.ttf', 8)
         except:
-            # Если файл не найден, используем стандартный шрифт
             self.reload_font = pygame.font.Font(None, 14)
 
     def _load_sounds(self):
@@ -101,8 +99,9 @@ class WeaponManager:
             if not enemy.is_dead:
                 dist = math.hypot(mx - enemy.x, my - enemy.y)
                 if dist <= (weapon_range + enemy.hitbox_radius):
-                    enemy.is_dead = True
-                    hits += 1
+                    # Наносим урон через take_damage
+                    if enemy.take_damage(1):
+                        hits += 1
         
         self.is_swinging = True
         self.swing_timer = self.stats['swing_duration']
@@ -160,7 +159,7 @@ class WeaponManager:
         stats = self.stats
         base_radius = max(12, int(stats['range'] * 0.25))
 
-        # 1. АТАКА (Взмах) - Остается на месте удара (self.attack_pos)
+        # 1. АТАКА (Взмах)
         if self.is_swinging:
             mx, my = int(self.attack_pos[0]), int(self.attack_pos[1])
             progress = 1.0 - (self.swing_timer / stats['swing_duration'])
@@ -173,7 +172,7 @@ class WeaponManager:
             
             pygame.draw.circle(surface, (r, g, b), (mx, my), current_range, 5)
 
-        # 2. WINDUP (Зарядка) - Следует за курсором
+        # 2. WINDUP (Зарядка)
         if self.windup_timer > 0:
             pct = 1.0 - (self.windup_timer / stats['windup_duration'])
             current_r = int(base_radius * pct)
@@ -182,7 +181,7 @@ class WeaponManager:
                 r, g, b = stats['swing_color']
                 pygame.draw.circle(surface, (r, g, b), (cmx, cmy), current_r, 3)
 
-        # 3. COOLDOWN - Следует за курсором
+        # 3. COOLDOWN
         elif self.cooldown_timer > 0:
             pct = self.cooldown_timer / stats['cooldown']
             current_r = int(base_radius * pct)
@@ -190,7 +189,7 @@ class WeaponManager:
             if current_r > 1:
                 pygame.draw.circle(surface, (255, 200, 0), (cmx, cmy), current_r, 3)
 
-        # 4. RELOAD (Перезарядка) - Следует за курсором
+        # 4. RELOAD (Перезарядка)
         if self.is_reloading:
             bullets_to_reload = self.max_ammo - self.current_ammo
             base_time = self.stats['reload_duration'] * (bullets_to_reload / self.max_ammo) if bullets_to_reload > 0 else 0.0
@@ -202,18 +201,16 @@ class WeaponManager:
             if current_r > 1:
                 pygame.draw.circle(surface, (0, 255, 255), (cmx, cmy), current_r, 3)
 
-        # 5. AMMO (Патроны) и текст RELOADING - Следует за курсором
+        # 5. AMMO (Патроны)
         if self.max_ammo > 0:
             dot_r = 3
             spacing = 10
             total_w = (self.max_ammo - 1) * spacing
             start_x = cmx - total_w // 2
-            y_pos = cmy - 25  # Позиция патронов
+            y_pos = cmy - 25
             
-            # Текст RELOADING строго над патронами
             if self.is_reloading:
                 reload_text = self.reload_font.render("RELOADING", True, (0, 255, 255))
-                # Размещаем текст выше патронов (y_pos - 15)
                 text_rect = reload_text.get_rect(center=(cmx, y_pos - 15))
                 surface.blit(reload_text, text_rect)
             
@@ -242,7 +239,7 @@ class WeaponManager:
                 else:
                     pygame.draw.circle(surface, (80, 80, 80), (x_pos, y_pos), dot_r)
 
-        # 6. ПРИЦЕЛ (Курсор) - Всегда следует за мышкой
+        # 6. ПРИЦЕЛ (Курсор)
         color = stats['cursor_color']
         pygame.draw.line(surface, color, (cmx-10, cmy), (cmx+10, cmy), 2)
         pygame.draw.line(surface, color, (cmx, cmy-10), (cmx, cmy+10), 2)

@@ -12,6 +12,13 @@ BTN_TEXT = (255, 255, 255)
 FPS = 60
 CORE_RADIUS = 30
 
+# --- ENEMY STATS ---
+ENEMY_STATS = {
+    'enemy-1': {'name': 'Walker', 'hp': 1, 'speed_multiplier': 1.0},
+    'enemy-2': {'name': 'Jumper', 'hp': 2, 'speed_multiplier': 1.5}, # 2 HP
+    'enemy-3': {'name': 'Shield', 'hp': 3, 'speed_multiplier': 0.3},  # 3 HP и очень медленный
+}
+
 # --- DIFFICULTY & WAVE SYSTEM ---
 DIFFICULTY_TARGETS = {
     'Easy': 600,
@@ -21,33 +28,55 @@ DIFFICULTY_TARGETS = {
 
 WAVE_PATTERNS = {
     'Easy': [
-        {'interval': 10.0, 'count': 1}, {'interval': 8.0, 'count': 2},
-        {'interval': 7.0, 'count': 2}, {'interval': 6.0, 'count': 3},
-        {'interval': 5.0, 'count': 3}, {'interval': 4.5, 'count': 4},
-        {'interval': 4.0, 'count': 4}, {'interval': 3.5, 'count': 5},
-        {'interval': 3.0, 'count': 6}, {'interval': 2.5, 'count': 8},
+        { # Минута 1
+            'enemy-1': {'interval': 3.0, 'count': 1},
+        },
+        { # Минута 2
+            'enemy-1': {'interval': 2.5, 'count': 2},
+            'enemy-2': {'interval': 5.0, 'count': 1},
+        },
+        { # Минута 3+
+            'enemy-1': {'interval': 2.0, 'count': 2},
+            'enemy-2': {'interval': 4.0, 'count': 1},
+            'enemy-3': {'interval': 10.0, 'count': 1},
+        }
     ],
     'Normal': [
-        {'interval': 8.0, 'count': 2}, {'interval': 7.0, 'count': 3},
-        {'interval': 6.0, 'count': 3}, {'interval': 5.0, 'count': 4},
-        {'interval': 4.5, 'count': 5}, {'interval': 4.0, 'count': 5},
-        {'interval': 3.5, 'count': 6}, {'interval': 3.0, 'count': 7},
-        {'interval': 2.5, 'count': 8}, {'interval': 2.0, 'count': 10},
-        {'interval': 1.8, 'count': 12}, {'interval': 1.5, 'count': 14},
-        {'interval': 1.2, 'count': 16}, {'interval': 1.0, 'count': 18},
-        {'interval': 0.8, 'count': 25},
+        { # Минута 1
+            'enemy-1': {'interval': 2.0, 'count': 2},
+            'enemy-2': {'interval': 5.0, 'count': 1},
+        },
+        { # Минута 2
+            'enemy-1': {'interval': 1.5, 'count': 2},
+            'enemy-2': {'interval': 4.0, 'count': 1},
+            'enemy-3': {'interval': 8.0, 'count': 1},
+        },
+        { # Минута 3
+            'enemy-1': {'interval': 1.2, 'count': 3},
+            'enemy-2': {'interval': 3.0, 'count': 2},
+            'enemy-3': {'interval': 6.0, 'count': 1},
+        },
+        { # Минута 4+
+            'enemy-1': {'interval': 1.0, 'count': 3},
+            'enemy-2': {'interval': 2.5, 'count': 2},
+            'enemy-3': {'interval': 5.0, 'count': 1},
+        }
     ],
     'Hard': [
-        {'interval': 6.0, 'count': 3}, {'interval': 5.5, 'count': 4},
-        {'interval': 5.0, 'count': 4}, {'interval': 4.5, 'count': 5},
-        {'interval': 4.0, 'count': 6}, {'interval': 3.5, 'count': 7},
-        {'interval': 3.0, 'count': 8}, {'interval': 2.5, 'count': 10},
-        {'interval': 2.0, 'count': 12}, {'interval': 1.8, 'count': 15},
-        {'interval': 1.5, 'count': 18}, {'interval': 1.2, 'count': 20},
-        {'interval': 1.0, 'count': 25}, {'interval': 0.8, 'count': 30},
-        {'interval': 0.7, 'count': 35}, {'interval': 0.6, 'count': 40},
-        {'interval': 0.5, 'count': 50}, {'interval': 0.4, 'count': 60},
-        {'interval': 0.3, 'count': 80}, {'interval': 0.2, 'count': 100},
+        { # Минута 1
+            'enemy-1': {'interval': 1.5, 'count': 2},
+            'enemy-2': {'interval': 4.0, 'count': 1},
+        },
+        { # Минута 2
+            'enemy-1': {'interval': 1.0, 'count': 3},
+            'enemy-2': {'interval': 3.0, 'count': 2},
+            'enemy-3': {'interval': 7.0, 'count': 1},
+        },
+        { # Минута 3+
+            'enemy-1': {'interval': 0.8, 'count': 3},
+            'enemy-2': {'interval': 2.0, 'count': 2},
+            'enemy-3': {'interval': 4.0, 'count': 1},
+        }
     ]
 }
 
@@ -85,6 +114,7 @@ def get_default_settings(native_res):
         'show_hitboxes': False,
         'effect_mode': 'OFF',
         'sfx_volume': 0.5,
-        'music_volume': 0.5,  # <-- НОВЫЙ ПАРАМЕТР
-        'enemy_speed': 150.0
+        'music_volume': 0.5,
+        'enemy_speed': 150.0,
+        'enemy_stats': ENEMY_STATS
     }
