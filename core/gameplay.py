@@ -1,4 +1,6 @@
 import math
+import random
+import pygame
 from entities.enemy import Enemy
 from settings import DIFFICULTY_TARGETS, WAVE_PATTERNS, ENEMY_STATS
 
@@ -18,7 +20,9 @@ class GameplayManager:
         
         self.spawn_timers = {}
         
-        # <-- ГАРАНТИЯ: добавляем статы врагов в настройки явно
+        # <-- НОВОЕ: Система частиц для смерти врагов
+        self.particles = []
+        
         if 'enemy_stats' not in self.game_settings:
             self.game_settings['enemy_stats'] = ENEMY_STATS
         
@@ -37,6 +41,7 @@ class GameplayManager:
 
     def reset(self):
         self.enemies = []
+        self.particles = []  # <-- Очистка частиц при рестарте
         self.score = 0
         self.game_won = False
         self.time_survived = 0.0
@@ -74,6 +79,23 @@ class GameplayManager:
 
         self.core.apply_effects(self.enemies, dt)
 
+        # <-- НОВОЕ: Спавн частиц при смерти врага
+        for enemy in self.enemies:
+            if enemy.just_died:
+                # Создаем 15-20 белых пикселей, разлетающихся в разные стороны
+                for _ in range(random.randint(15, 20)):
+                    angle = random.uniform(0, 2 * math.pi)
+                    speed = random.uniform(60, 180)
+                    self.particles.append({
+                        'x': enemy.x,
+                        'y': enemy.y,
+                        'vx': math.cos(angle) * speed,
+                        'vy': math.sin(angle) * speed,
+                        'life': random.uniform(0.3, 0.6),  # Время жизни в секундах
+                        'size': random.randint(2, 4)
+                    })
+                enemy.just_died = False
+
         core_hit = False
         for enemy in self.enemies:
             if enemy.is_dead:
@@ -88,6 +110,25 @@ class GameplayManager:
                 self.game_won = False
                 return True
 
+        # <-- НОВОЕ: Обновление частиц
+        for p in self.particles:
+            p['x'] += p['vx'] * dt
+            p['y'] += p['vy'] * dt
+            p['life'] -= dt
+        self.particles = [p for p in self.particles if p['life'] > 0]
+
+        # Удаляем мертвых врагов
         self.enemies = [enemy for enemy in self.enemies if not enemy.is_dead]
         
         return False
+
+    # <-- НОВОЕ: Метод для отрисовки частиц
+    def draw_particles(self, surface):
+        for p in self.particles:
+            alpha = int(255 * (p['life'] / 0.6))  # Плавное исчезновение
+            alpha = max(0, min(255, alpha))
+            color = (255, 255, 255, alpha)  # Белые пиксели
+            
+            p_surf = pygame.Surface((int(p['size']), int(p['size'])), pygame.SRCALPHA)
+            p_surf.fill(color)
+            surface.blit(p_surf, (int(p['x'] - p['size']/2), int(p['y'] - p['size']/2)))

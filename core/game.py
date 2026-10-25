@@ -3,10 +3,11 @@ os.environ['SDL_RENDER_SCALE_QUALITY'] = 'nearest'
 
 import pygame
 import sys
+import random
 from settings import *
 from ui import DropdownButton, PauseMenu
 from entities import Core
-from utils.sprite_manager import SpriteManager # <-- Убедись, что импорт правильный
+from utils.sprite_manager import SpriteManager
 from core.constants import *
 from core.assets import AssetManager
 from core.ui_factory import UIFactory
@@ -58,6 +59,10 @@ class Game:
         self.game_surface = None
         self.effects_manager = None
 
+        # <-- НОВОЕ: Переменные для тряски экрана
+        self.shake_timer = 0.0
+        self.shake_intensity = 0.0
+
         self.apply_settings()
 
     def apply_settings(self):
@@ -82,8 +87,6 @@ class Game:
         self.effects_manager.mode = self.game_settings.get('effect_mode', 'OFF')
 
         self.asset_manager.load_all()
-        
-        # <-- НОВОЕ: Загрузка анимаций врагов при инициализации/смене настроек
         self.sprite_manager.load_enemy_animations("enemies")
 
         if self.core is None:
@@ -107,6 +110,15 @@ class Game:
         
         self.weapon_manager.set_volume(self.game_settings.get('sfx_volume', 0.5))
         pygame.mixer.music.set_volume(self.game_settings.get('music_volume', 0.5))
+        
+        self.update_cursor_visibility()
+
+    def update_cursor_visibility(self):
+        # <-- НОВОЕ: Централизованное управление видимостью курсора
+        if self.current_state == STATE_PLAYING and not self.console_active:
+            pygame.mouse.set_visible(False)
+        else:
+            pygame.mouse.set_visible(True)
 
     def reset_game(self):
         sw, sh = self.screen.get_width(), self.screen.get_height()
@@ -114,6 +126,8 @@ class Game:
         self.gameplay = GameplayManager(self.game_settings, self.core, self.sprite_manager)
         self.weapon_manager.reset_timers()
         self.current_state = STATE_PLAYING
+        
+        self.update_cursor_visibility()
         
         music_path = "music/music_round_1.wav"
         if os.path.exists(music_path):
@@ -140,6 +154,7 @@ class Game:
         elif self.current_state == STATE_PAUSED:
             self.current_state = STATE_PLAYING
             pygame.mixer.music.unpause()
+        self.update_cursor_visibility()
 
     def _execute_console_command(self):
         cmd_str = self.console_input.strip()
@@ -189,6 +204,7 @@ class Game:
                             else: self.console_input = self.console_history[-(self.history_index + 1)]
                     elif event.unicode and event.unicode.isprintable():
                         self.console_input += event.unicode
+                self.update_cursor_visibility()
                 return
 
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
@@ -296,7 +312,8 @@ class Game:
 
             elif self.current_state == STATE_PAUSED:
                 action = self.pause_menu.handle_event(event)
-                if action == 'resume': self.toggle_pause()
+                if action == 'resume': 
+                    self.toggle_pause()
                 elif action == 'quit_to_menu': 
                     self.current_state = STATE_MENU
                     self.stop_music()
@@ -307,15 +324,24 @@ class Game:
                 elif self.ui_elements['btn_menu'].is_clicked(event): 
                     self.current_state = STATE_MENU
                     self.stop_music()
+            
+            self.update_cursor_visibility()
 
     def update(self, dt, sw, sh):
         if self.current_state == STATE_PLAYING:
             mouse_pos = pygame.mouse.get_pos()
             hits = self.weapon_manager.update(dt, mouse_pos, self.gameplay.enemies)
             if hits > 0: self.gameplay.score += hits
+            
+            prev_hp = self.core.current_hp
             if self.gameplay.update(dt, sw, sh):
                 self.current_state = STATE_GAMEOVER
                 self.stop_music()
+            
+            # <-- НОВОЕ: Триггер тряски экрана при получении урона ядром
+            if self.core.current_hp < prev_hp:
+                self.shake_timer = 0.3  # Трясем 0.3 секунды
+                self.shake_intensity = 12.0  # Амплитуда тряски в пикселях
 
     def draw(self, sw, sh):
         Renderer.draw(
@@ -333,10 +359,24 @@ class Game:
             mouse_pos = pygame.mouse.get_pos()
             self.weapon_manager.draw(self.game_surface, mouse_pos)
             
+        # <-- НОВОЕ: Отрисовка частиц смерти врагов
+        if self.gameplay:
+            self.gameplay.draw_particles(self.game_surface)
+            
         if self.effects_manager:
             self.effects_manager.apply(self.game_surface)
             
-        self.screen.blit(self.game_surface, (0, 0))
+        # <-- НОВОЕ: Применение тряски экрана
+        offset_x = 0
+        offset_y = 0
+        if self.shake_timer > 0:
+            self.shake_timer -= self.clock.get_time() / 1000.0
+            if self.shake_timer > 0:
+                offset_x = random.uniform(-self.shake_intensity, self.shake_intensity)
+                offset_y = random.uniform(-self.shake_intensity, self.shake_intensity)
+                self.shake_intensity *= 0.9  # Плавное затухание тряски
+        
+        self.screen.blit(self.game_surface, (offset_x, offset_y))
 
     def run(self):
         while True:
