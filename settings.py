@@ -80,25 +80,6 @@ WAVE_PATTERNS = {
     ]
 }
 
-# --- WEAPON SYSTEM ---
-WEAPONS = {
-    'sword': {
-        'name': 'SWORD', 'cooldown': 0.45, 'windup_duration': 0.0, 'swing_duration': 0.15,
-        'range': 60, 'swing_color': (255, 255, 150), 'cursor_color': (220, 220, 220),
-        'magazine_size': 0, 'reload_duration': 0.0
-    },
-    'hammer': {
-        'name': 'HAMMER', 'cooldown': 1.2, 'windup_duration': 0.35, 'swing_duration': 0.25,
-        'range': 140, 'swing_color': (255, 100, 50), 'cursor_color': (180, 100, 100),
-        'magazine_size': 0, 'reload_duration': 0.0
-    },
-    'pistol': {
-        'name': 'PISTOL', 'cooldown': 0.15, 'windup_duration': 0.0, 'swing_duration': 0.1,
-        'range': 40, 'swing_color': (255, 255, 0), 'cursor_color': (200, 200, 255),
-        'magazine_size': 6, 'reload_duration': 1.5
-    }
-}
-
 DEFAULT_WEAPON = 'sword'
 
 # --- UI & RESOLUTIONS ---

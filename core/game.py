@@ -6,7 +6,8 @@ import sys
 import random
 from settings import *
 from ui import DropdownButton, PauseMenu
-from entities import Core
+# Импортируем фабрику ядер вместо прямого импорта класса Core
+from cores import get_core, get_available_cores
 from utils.sprite_manager import SpriteManager
 from core.constants import *
 from core.assets import AssetManager
@@ -59,7 +60,7 @@ class Game:
         self.game_surface = None
         self.effects_manager = None
 
-        # <-- НОВОЕ: Переменные для тряски экрана
+        # Переменные для тряски экрана
         self.shake_timer = 0.0
         self.shake_intensity = 0.0
 
@@ -89,10 +90,14 @@ class Game:
         self.asset_manager.load_all()
         self.sprite_manager.load_enemy_animations("enemies")
 
-        if self.core is None:
-            self.core = Core(w, h, self.sprite_manager, core_type=self.selected_core_type)
+        # --- ОБНОВЛЕННАЯ ЛОГИКА СОЗДАНИЯ/ОБНОВЛЕНИЯ ЯДРА ---
+        # Если ядра нет ИЛИ тип ядра в настройках изменился, создаем новое
+        if self.core is None or self.core.name != self.selected_core_type.upper():
+            self.core = get_core(self.selected_core_type, w, h, self.sprite_manager)
         else:
+            # Иначе просто обновляем размеры под новое разрешение
             self.core.update_size(w, h, self.sprite_manager)
+        # ----------------------------------------------------
 
         if self.gameplay is None:
             self.gameplay = GameplayManager(self.game_settings, self.core, self.sprite_manager)
@@ -114,7 +119,6 @@ class Game:
         self.update_cursor_visibility()
 
     def update_cursor_visibility(self):
-        # <-- НОВОЕ: Централизованное управление видимостью курсора
         if self.current_state == STATE_PLAYING and not self.console_active:
             pygame.mouse.set_visible(False)
         else:
@@ -122,7 +126,9 @@ class Game:
 
     def reset_game(self):
         sw, sh = self.screen.get_width(), self.screen.get_height()
-        self.core = Core(sw, sh, self.sprite_manager, core_type=self.selected_core_type)
+        # --- ОБНОВЛЕННОЕ СОЗДАНИЕ ЯДРА ---
+        self.core = get_core(self.selected_core_type, sw, sh, self.sprite_manager)
+        # ----------------------------------
         self.gameplay = GameplayManager(self.game_settings, self.core, self.sprite_manager)
         self.weapon_manager.reset_timers()
         self.current_state = STATE_PLAYING
@@ -338,10 +344,10 @@ class Game:
                 self.current_state = STATE_GAMEOVER
                 self.stop_music()
             
-            # <-- НОВОЕ: Триггер тряски экрана при получении урона ядром
+            # Триггер тряски экрана при получении урона ядром
             if self.core.current_hp < prev_hp:
-                self.shake_timer = 0.3  # Трясем 0.3 секунды
-                self.shake_intensity = 12.0  # Амплитуда тряски в пикселях
+                self.shake_timer = 0.3
+                self.shake_intensity = 12.0
 
     def draw(self, sw, sh):
         Renderer.draw(
@@ -359,14 +365,14 @@ class Game:
             mouse_pos = pygame.mouse.get_pos()
             self.weapon_manager.draw(self.game_surface, mouse_pos)
             
-        # <-- НОВОЕ: Отрисовка частиц смерти врагов
+        # Отрисовка частиц смерти врагов
         if self.gameplay:
             self.gameplay.draw_particles(self.game_surface)
             
         if self.effects_manager:
             self.effects_manager.apply(self.game_surface)
             
-        # <-- НОВОЕ: Применение тряски экрана
+        # Применение тряски экрана
         offset_x = 0
         offset_y = 0
         if self.shake_timer > 0:
@@ -374,7 +380,7 @@ class Game:
             if self.shake_timer > 0:
                 offset_x = random.uniform(-self.shake_intensity, self.shake_intensity)
                 offset_y = random.uniform(-self.shake_intensity, self.shake_intensity)
-                self.shake_intensity *= 0.9  # Плавное затухание тряски
+                self.shake_intensity *= 0.9
         
         self.screen.blit(self.game_surface, (offset_x, offset_y))
 

@@ -139,6 +139,9 @@ class Renderer:
         start_x = int(core.x) - (total_width // 2)
         y = int(core.y) - core.hitbox_radius - 55
         
+        # ИСПРАВЛЕНО: используем core.name вместо несуществующего core.core_type
+        is_slow = (core.name == 'SLOW')
+        
         if core.current_hp < core.max_hp:
             time_left = int(core.regen_time_per_hp - core.regen_timer) + 1
             regen_text = f"REGEN: {time_left}s"
@@ -149,7 +152,8 @@ class Renderer:
             rect = pygame.Rect(start_x + i * (cell_size + gap), y, cell_size, cell_size)
             
             if i < core.current_hp:
-                color = (50, 150, 255) if core.core_type == 'slow' else (255, 100, 50)
+                # ИСПРАВЛЕНО: проверка через is_slow
+                color = (50, 150, 255) if is_slow else (255, 100, 50)
                 pygame.draw.rect(screen, color, rect, border_radius=4)
                 pygame.draw.rect(screen, (255, 255, 255), rect, 2, border_radius=4)
             else:
@@ -161,7 +165,8 @@ class Renderer:
                     fill_height = int(cell_size * progress)
                     if fill_height > 0:
                         fill_rect = pygame.Rect(rect.x, rect.y + cell_size - fill_height, cell_size, fill_height)
-                        fill_color = (100, 255, 100) if core.core_type == 'slow' else (255, 200, 50)
+                        # ИСПРАВЛЕНО: проверка через is_slow
+                        fill_color = (100, 255, 100) if is_slow else (255, 200, 50)
                         pygame.draw.rect(screen, fill_color, fill_rect, border_radius=4)
 
     @staticmethod
