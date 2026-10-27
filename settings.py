@@ -12,13 +12,6 @@ BTN_TEXT = (255, 255, 255)
 FPS = 60
 CORE_RADIUS = 30
 
-# --- ENEMY STATS ---
-ENEMY_STATS = {
-    'enemy-1': {'name': 'Walker', 'hp': 1, 'speed_multiplier': 1.0},
-    'enemy-2': {'name': 'Jumper', 'hp': 2, 'speed_multiplier': 1.5}, # 2 HP
-    'enemy-3': {'name': 'Shield', 'hp': 3, 'speed_multiplier': 0.3},  # 3 HP и очень медленный
-}
-
 # --- DIFFICULTY & WAVE SYSTEM ---
 DIFFICULTY_TARGETS = {
     'Easy': 600,
@@ -80,8 +73,6 @@ WAVE_PATTERNS = {
     ]
 }
 
-DEFAULT_WEAPON = 'sword'
-
 # --- UI & RESOLUTIONS ---
 STANDARD_RESOLUTIONS = [
     (1280, 720), (1920, 1080), (2560, 1440)
@@ -96,6 +87,6 @@ def get_default_settings(native_res):
         'effect_mode': 'OFF',
         'sfx_volume': 0.5,
         'music_volume': 0.5,
-        'enemy_speed': 150.0,
-        'enemy_stats': ENEMY_STATS
+        'enemy_speed': 150.0
+        # 'enemy_stats' удален, так как статы теперь инкапсулированы в классах врагов
     }
