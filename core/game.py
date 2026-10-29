@@ -6,7 +6,6 @@ import sys
 import random
 from settings import *
 from ui import DropdownButton, PauseMenu
-# Импортируем фабрику ядер вместо прямого импорта класса Core
 from cores import get_core, get_available_cores
 from utils.sprite_manager import SpriteManager
 from core.constants import *
@@ -36,7 +35,7 @@ class Game:
         self.available_resolutions.sort(key=lambda x: (x[0], x[1]))
 
         self.screen = pygame.display.set_mode(self.native_res, pygame.RESIZABLE)
-        pygame.display.set_caption("Defend the Core")
+        pygame.display.set_caption("CORE DEFENSE")
         self.clock = pygame.time.Clock()
 
         self.sprite_manager = SpriteManager()
@@ -51,6 +50,11 @@ class Game:
         self.ui_elements = {}
         self.selected_core_type = 'plosive'
 
+        # --- Новые флаги для объединенного экрана выбора ---
+        self.weapon_selected = None
+        self.core_selected = None
+        # ---------------------------------------------------
+
         self.console_active = False
         self.console_input = ""
         self.console_history = []
@@ -60,7 +64,6 @@ class Game:
         self.game_surface = None
         self.effects_manager = None
 
-        # Переменные для тряски экрана
         self.shake_timer = 0.0
         self.shake_intensity = 0.0
 
@@ -77,7 +80,7 @@ class Game:
             flags = pygame.RESIZABLE
 
         self.screen = pygame.display.set_mode((w, h), flags)
-        pygame.display.set_caption("Defend the Core")
+        pygame.display.set_caption("CORE DEFENSE")
         pygame.event.pump()
 
         self.game_surface = pygame.Surface((w, h))
@@ -90,14 +93,10 @@ class Game:
         self.asset_manager.load_all()
         self.sprite_manager.load_enemy_animations("enemies")
 
-        # --- ОБНОВЛЕННАЯ ЛОГИКА СОЗДАНИЯ/ОБНОВЛЕНИЯ ЯДРА ---
-        # Если ядра нет ИЛИ тип ядра в настройках изменился, создаем новое
         if self.core is None or self.core.name != self.selected_core_type.upper():
             self.core = get_core(self.selected_core_type, w, h, self.sprite_manager)
         else:
-            # Иначе просто обновляем размеры под новое разрешение
             self.core.update_size(w, h, self.sprite_manager)
-        # ----------------------------------------------------
 
         if self.gameplay is None:
             self.gameplay = GameplayManager(self.game_settings, self.core, self.sprite_manager)
@@ -126,9 +125,7 @@ class Game:
 
     def reset_game(self):
         sw, sh = self.screen.get_width(), self.screen.get_height()
-        # --- ОБНОВЛЕННОЕ СОЗДАНИЕ ЯДРА ---
         self.core = get_core(self.selected_core_type, sw, sh, self.sprite_manager)
-        # ----------------------------------
         self.gameplay = GameplayManager(self.game_settings, self.core, self.sprite_manager)
         self.weapon_manager.reset_timers()
         self.current_state = STATE_PLAYING
@@ -177,6 +174,11 @@ class Game:
                 try: seconds = int(parts[1])
                 except ValueError: pass
             self.gameplay.time_survived += seconds
+
+    def _clear_loadout_selection(self):
+        """Сбрасывает выбор оружия и ядра."""
+        self.weapon_selected = None
+        self.core_selected = None
 
     def handle_events(self):
         for event in pygame.event.get():
@@ -228,27 +230,54 @@ class Game:
                     sys.exit()
 
             elif self.current_state == STATE_WEAPON_SELECT:
-                if self.ui_elements['btn_weapon_sword'].is_clicked(event):
-                    self.weapon_manager.set_weapon('sword')
-                    self.current_state = STATE_CORE_SELECT
-                elif self.ui_elements['btn_weapon_hammer'].is_clicked(event):
-                    self.weapon_manager.set_weapon('hammer')
-                    self.current_state = STATE_CORE_SELECT
-                elif self.ui_elements['btn_weapon_pistol'].is_clicked(event):
-                    self.weapon_manager.set_weapon('pistol')
-                    self.current_state = STATE_CORE_SELECT
-                elif self.ui_elements['btn_wep_back'].is_clicked(event): 
-                    self.current_state = STATE_MENU
+                # --- Клик по оружию ---
+                weapon_clicked = None
+                for w in ['sword', 'hammer', 'pistol']:
+                    if self.ui_elements[f'btn_weapon_{w}'].is_clicked(event):
+                        weapon_clicked = w
+                        break
 
-            elif self.current_state == STATE_CORE_SELECT:
-                if self.ui_elements['btn_core_plosive'].is_clicked(event):
-                    self.selected_core_type = 'plosive'
+                if weapon_clicked:
+                    if self.weapon_selected == weapon_clicked:
+                        # Повторный клик по выбранному — отмена выбора оружия (и ядра)
+                        self.weapon_selected = None
+                        self.core_selected = None
+                    else:
+                        # Выбираем новое оружие, сбрасываем ядро
+                        self.weapon_selected = weapon_clicked
+                        self.weapon_manager.set_weapon(weapon_clicked)
+                        self.core_selected = None
+
+                # --- Клик по ядру (только если оружие выбрано) ---
+                if self.weapon_selected is not None:
+                    core_clicked = None
+                    for c in ['plosive', 'slow']:
+                        if self.ui_elements[f'btn_core_{c}'].is_clicked(event):
+                            core_clicked = c
+                            break
+                    if core_clicked:
+                        if self.core_selected == core_clicked:
+                            # Повторный клик — отмена выбора ядра
+                            self.core_selected = None
+                        else:
+                            self.core_selected = core_clicked
+                            self.selected_core_type = core_clicked
+
+                # --- Клик по NEXT (только если ядро выбрано) ---
+                if self.core_selected is not None and self.ui_elements['btn_next'].is_clicked(event):
                     self.current_state = STATE_DIFFICULTY
-                elif self.ui_elements['btn_core_slow'].is_clicked(event):
-                    self.selected_core_type = 'slow'
-                    self.current_state = STATE_DIFFICULTY
-                elif self.ui_elements['btn_core_back'].is_clicked(event): 
-                    self.current_state = STATE_WEAPON_SELECT
+
+                # --- Клик по BACK ---
+                if self.ui_elements['btn_sel_back'].is_clicked(event):
+                    if self.core_selected is not None:
+                        # Отменяем выбор ядра
+                        self.core_selected = None
+                    elif self.weapon_selected is not None:
+                        # Отменяем выбор оружия
+                        self.weapon_selected = None
+                    else:
+                        # Возврат в главное меню
+                        self.current_state = STATE_MENU
 
             elif self.current_state == STATE_DIFFICULTY:
                 if self.ui_elements['btn_easy'].is_clicked(event):
@@ -261,7 +290,7 @@ class Game:
                     self.game_settings['difficulty'] = 'Hard'
                     self.reset_game()
                 elif self.ui_elements['btn_diff_back'].is_clicked(event): 
-                    self.current_state = STATE_CORE_SELECT
+                    self.current_state = STATE_WEAPON_SELECT
 
             elif self.current_state == STATE_SETTINGS:
                 if self.ui_elements['slider_volume'].handle_event(event):
@@ -322,6 +351,7 @@ class Game:
                     self.toggle_pause()
                 elif action == 'quit_to_menu': 
                     self.current_state = STATE_MENU
+                    self._clear_loadout_selection()
                     self.stop_music()
 
             elif self.current_state == STATE_GAMEOVER:
@@ -329,6 +359,7 @@ class Game:
                     self.reset_game()
                 elif self.ui_elements['btn_menu'].is_clicked(event): 
                     self.current_state = STATE_MENU
+                    self._clear_loadout_selection()
                     self.stop_music()
             
             self.update_cursor_visibility()
@@ -344,7 +375,6 @@ class Game:
                 self.current_state = STATE_GAMEOVER
                 self.stop_music()
             
-            # Триггер тряски экрана при получении урона ядром
             if self.core.current_hp < prev_hp:
                 self.shake_timer = 0.3
                 self.shake_intensity = 12.0
@@ -358,21 +388,20 @@ class Game:
             self.game_settings['show_hitboxes'], self.pause_menu,
             self.gameplay.time_survived, self.gameplay.score, self.gameplay.game_won,
             sw, sh, self.console_active, self.console_input,
-            self.sprite_manager
+            self.sprite_manager,
+            self.weapon_selected, self.core_selected
         )
         
         if self.current_state == STATE_PLAYING and not self.console_active:
             mouse_pos = pygame.mouse.get_pos()
             self.weapon_manager.draw(self.game_surface, mouse_pos)
             
-        # Отрисовка частиц смерти врагов
         if self.gameplay:
             self.gameplay.draw_particles(self.game_surface)
             
         if self.effects_manager:
             self.effects_manager.apply(self.game_surface)
             
-        # Применение тряски экрана
         offset_x = 0
         offset_y = 0
         if self.shake_timer > 0:
